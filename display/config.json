@@ -1,5 +1,12 @@
 {
     "data_directory": "../../data",
     "quit_button": "q",
-    "task_length": 10
+    "task_length": 10,
+
+    "screen_number": 0,
+    "monitor_info": {
+        "distance_cm": 136,
+        "width_cm": 85.7,
+        "size_pix": [1024, 768]
+    }
 }

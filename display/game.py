@@ -37,15 +37,11 @@ class Game(object):
 
         self.quit_button = C["quit_button"]
 
-        self.monitor_params = {
-            "distance_cm": 136,
-            "width_cm": 85.7,
-            "size_pix": [1024, 768],
-        }
+        self.monitor_params = C["monitor_info"]
         self.window_params = {
             "size": [800, 800], # when not fullscreen
             "color": "gray", # background
-            "screen": -1,
+            "screen": C["screen_number"],
             "units": "deg",
             "fullscr": self.development_mode^1,
             "allowGUI": False,
