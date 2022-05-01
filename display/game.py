@@ -65,8 +65,9 @@ class Game(object):
         ])
 
     def init_slack(self):
-        with open("./slack_url.txt", "r") as f:
-            self.slack_url = f.read().strip()
+        if os.path.exists("./slack_url.txt"):
+            with open("./slack_url.txt", "r") as f:
+                self.slack_url = f.read().strip()
 
     def init_exporting(self):
         log_fname = os.path.join(self.data_directory, self.experiment_id+".log")
@@ -96,10 +97,6 @@ class Game(object):
             name="ShapeStim-play",
             width=1, height=1, pos=[0, -8],
             fillColor="green", lineColor="black", lineWidth=1)
-
-    def init_slack(self):
-        with open("./slack_url.txt", "r") as f:
-            self.slack_url = f.read().strip()
 
     def send_slack_notification(self, text):
         if not self.development_mode:
