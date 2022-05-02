@@ -27,8 +27,10 @@ class Game(object):
         self.development_mode = subject_number == 999
 
         self.data_directory = C["data_directory"]
-
+        self.slack_url_path = C["slack_url_path"]
+        
         self.pport_address = C["parallel_port_address"]
+        self.pport_codes = C["parallel_port_codes"]
 
         self.data = {}
         self.passed_practice = False
@@ -75,11 +77,18 @@ class Game(object):
             self.pport = None
             msg = "Parallel port connection failed."
         self.send_slack_notification(msg)
-        print(msg)
+
+    def send_to_pport(self, portcode):
+        """Wrapper to avoid rewriting if not None a bunch"""
+        if self.pport is not None:
+            self.pport.setData(portcode)
+            self.pport.setData(0)
+        elif self.development_mode:
+            print(portcode)
 
     def init_slack(self):
-        if os.path.exists("./slack_url.txt"):
-            with open("./slack_url.txt", "r") as f:
+        if os.path.exists(self.slack_url_path):
+            with open(self.slack_url_path, "r") as f:
                 self.slack_url = f.read().strip()
 
     def init_exporting(self):
@@ -101,9 +110,8 @@ class Game(object):
             pos=[0, 4], height=.5, wrapWidth=20, color="white")
         self.middleText = visual.TextStim(self.win, name="middleTextStim",
             pos=[0, 0], height=.5, wrapWidth=20, color="white")
-        # self.bottomText = visual.TextStim(self.win, name="bottomTextStim",
-        #     text="Left-click in the green box to continue",
-        #     pos=[0, -6], height=.5, wrapWidth=20, color="white")
+        self.bottomText = visual.TextStim(self.win, name="bottomTextStim",
+            pos=[0, -4], height=.5, wrapWidth=20, color="white")
         self.fixationStim = visual.GratingStim(self.win, name="fixationStim",
             mask="cross", tex=None, size=[1, 1])
         self.nextButton = visual.Rect(self.win,

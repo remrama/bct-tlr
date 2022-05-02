@@ -33,11 +33,6 @@ class BreathCountingTask(Game):
         self.task_length = task_length_mins * 60
         self.min_press_gap = min_press_gap
 
-        # Keyboard
-        self.target_button = "right"
-        self.nontarget_button = "left"
-        self.reset_button = "space"
-
         self.taskClock = core.Clock() # gets reset when real task starts
 
         self.min_opacity = .1 # for the text/arrows during practice
@@ -58,7 +53,7 @@ class BreathCountingTask(Game):
             no matter what pace you breathe or how accurate you are at counting.
             
             Remember to sit in a comfortable position, focus primarily on your breathing,
-            and you can press """ + self.reset_button.capitalize() + """ to reset the counter if you lose track.
+            and you can press the Scroll Wheel down to reset the counter if you lose track.
 
             A message will appear on screen to let you know when the time is up.
             If you have any questions, you should ask the experimenter at this time.
@@ -66,17 +61,17 @@ class BreathCountingTask(Game):
         restart_txt = """Let's restart the counter."""
 
         practice_instructions = """
-            Press the """ + self.nontarget_button.capitalize() + " Arrow with breaths 1-" + str(self.target_digit-1) + """,
-            and the """ + self.target_button.capitalize() + " Arrow with breath " + str(self.target_digit) + """.
+            Press either of the Top buttons with breaths 1-""" + str(self.target_digit-1) + """,
+            and the Trigger button with breath """ + str(self.target_digit) + """.
 
-            Press """ + self.reset_button.capitalize() + """ and restart the count at 1 if you lose track.
+            Press the Scroll Wheel and restart the count at 1 if you lose track.
             """
         # practice_instructions = "Breathe slowly and keep count of your breaths.\nPress " + self.nontarget_button.capitalize() + " Arrow on breaths 1-" + str(self.target_digit-1) + ".\nPress " + self.target_button.capitalize() + " Arrow on breath " + str(self.target_digit) + ".\nRestart the count.",
         
         self.header_text = {
             "fast": "That breath was too fast.",
-            "early": "Don't press the " + self.target_button.capitalize() + " Arrow until count " + str(self.target_digit) + "." + "\n\n" + restart_txt,
-            "late": "Remember to press the " + self.target_button.capitalize() + " Arrow on count " + str(self.target_digit) + "." + "\n\n" + "The count will not reset until " + self.target_button.capitalize() + " or " + self.reset_button.capitalize() + " is pressed.",
+            "early": "Don't press the Trigger button until count " + str(self.target_digit) + "." + "\n\n" + restart_txt,
+            "late": "Remember to press the Trigger button on count " + str(self.target_digit) + "." + "\n\n" + "The count will not reset until the Trigger or the Scroll Wheel is pressed.",
             "instructions": practice_instructions,
         }
 
@@ -108,12 +103,12 @@ class BreathCountingTask(Game):
             while most of the attention is on feeling the breath.
             """,
             """
-            Press the """ + self.nontarget_button.capitalize() + " Arrow on breaths 1-" + str(self.target_digit-1) + """,
-            and the """ + self.target_button.capitalize() + " Arrow on breath " + str(self.target_digit) + """.
+            Press either of the Top buttons on breaths 1-""" + str(self.target_digit-1) + """,
+            and the Trigger button on breath """ + str(self.target_digit) + """.
             This means you'll be pressing a button with each breath.
 
             If you find that you have forgotten the count,
-            just press """ + self.reset_button.capitalize() + """ and restart the count at 1 with the next breath.
+            just press down on the Scroll Wheel and restart the count at 1 with the next breath.
 
             Do not count the breaths using your fingers but only in your head.
             """,
@@ -205,9 +200,10 @@ class BreathCountingTask(Game):
         while (not cycle_ended) and (not self.task_ended):
             response = self.collect_response()
             if response is not None:
+                self.send_to_pport(self.pport_codes[f"bct-{response}"])
                 self.cycle_responses.append(response)
                 self.breath_counter += 1
-                if self.target_button in response or self.reset_button in response:
+                if "target" in response or "reset" in response:
                     cycle_ended = True
         # Get cycle stats (accuracy to save and others to slack)
         # Save
@@ -240,16 +236,20 @@ class BreathCountingTask(Game):
             presses, timestamps = self.mouse.getPressed(getTime=True)
             if sum(presses) == 1: # a button was clicked
                 self.flutter_fixation()
-                clicked_index = presses.index(True) # left=0 right=1
+                clicked_index = presses.index(True)
                 rt = timestamps[clicked_index]
-                response = "left" if clicked_index == 0 else "right"
+                response = {
+                    0: "nontarget",
+                    2: "target",
+                    1: "reset"
+                }[clicked_index]
                 # left_clicked, right_clicked, _ = presses
                 # left_rt, right_rt, _ = timestamps
                 if not self.passed_practice:
                     txt_key = "instructions"
-                    if response == "right" and self.breath_counter < self.target_digit:
+                    if response == "target" and self.breath_counter < self.target_digit:
                         txt_key = "early"
-                    elif response == "left" and self.breath_counter == self.target_digit:
+                    elif response == "nontarget" and self.breath_counter == self.target_digit:
                         txt_key = "late"
                     elif self.cycle_responses:
                         if rt < self.min_press_gap:
@@ -341,11 +341,14 @@ class BreathCountingTask(Game):
 
     def task(self):
         self.show_message_and_wait_for_press(self.pretask_message)
+        core.wait(1) # just to clear to mouse is lifted before starting
         self.send_slack_notification("Task started")
+        self.send_to_pport(self.pport_codes["bct-start"])
         logging.log(level=logging.INFO, msg="Main task started")
         self.taskClock.reset()
         while not self.task_ended:
             self.single_cycle()
+        self.send_to_pport(self.pport_codes["bct-stop"])
 
     def run(self):
         self.init()

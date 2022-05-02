@@ -1,7 +1,7 @@
 {
     "data_directory": "../../data",
-    "parallel_port_address": "0x3FD8",
-    
+    "slack_url_path": "./slack_url.txt",
+
     "quit_button": "q",
     "task_length": 10,
 
@@ -10,5 +10,22 @@
         "distance_cm": 136,
         "width_cm": 85.7,
         "size_pix": [1024, 768]
+    },
+
+    "parallel_port_address": "0x3FD8",
+    "parallel_port_codes": {
+        "bct-start": 10,
+        "bct-stop": 11,
+        "bct-target": 12,
+        "bct-nontarget": 13,
+        "bct-reset": 14,
+        "svp-start": 20,
+        "svp-stop": 21,
+        "svp-target": 22,
+        "svp-nontarget": 23,
+        "soc-start": 30,
+        "soc-stop": 31,
+        "mwt-start": 40,
+        "mwt-stop": 41
     }
 }

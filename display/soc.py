@@ -43,6 +43,7 @@ class StreamOfConsciousness(Game):
 
 
     def task(self):
+        self.send_to_pport(self.pport_codes["soc-start"])
         self.clockCountdown = core.CountdownTimer(start=self.task_length)
         n_lines = 1
         while self.clockCountdown.getTime() > 0:
@@ -56,6 +57,7 @@ class StreamOfConsciousness(Game):
                 self.editableText.pos[1] += self.newline_spacing
                 n_lines += 1
             self.check_for_quit()
+        self.send_to_pport(self.pport_codes["soc-stop"])
 
     def run(self):
         self.init()

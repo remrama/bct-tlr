@@ -190,11 +190,13 @@ class SerialVisualPresentation(Game):
         # self.trial_counter = 0
         self.show_message_and_wait_for_press(self.pretask_message)
         self.send_slack_notification("SVP Task started")
+        self.send_to_pport(self.pport_codes["svp-start"])
         self.prior_stims = []
         self.taskClock.reset()
         while self.taskClock.getTime() < self.task_length-self.trial_length:
             self.single_trial()
             self.save_data()
+        self.send_to_pport(self.pport_codes["svp-stop"])
 
 
     def practice(self):
