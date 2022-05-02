@@ -1,5 +1,7 @@
 {
     "data_directory": "../../data",
+    "parallel_port_address": "0x3FD8",
+    
     "quit_button": "q",
     "task_length": 10,
 

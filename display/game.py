@@ -10,8 +10,7 @@ import random
 import inspect
 import requests
 
-from psychopy import core, visual, event, monitors, logging
-
+from psychopy import core, visual, event, monitors, logging, parallel
 
 # Load parameters from configuration file.
 with open("./config.json", "r", encoding="utf-8") as f:
@@ -28,6 +27,8 @@ class Game(object):
         self.development_mode = subject_number == 999
 
         self.data_directory = C["data_directory"]
+
+        self.pport_address = C["parallel_port_address"]
 
         self.data = {}
         self.passed_practice = False
@@ -53,6 +54,7 @@ class Game(object):
         self.init_stimuli()
         self.mouse = event.Mouse(self.win)
         self.init_slack()
+        self.init_pport()
         self.init_exporting()
         self.show_message_and_wait_for_press(self.welcome_message)
         self.send_slack_notification("Experiment started")
@@ -63,6 +65,17 @@ class Game(object):
             f"ses-{self.session_number:03d}",
             f"task-{self.task_name}"
         ])
+
+    def init_pport(self):
+        try:
+            self.pport = parallel.ParallelPort(address=self.pport_address)
+            self.pport.setData(0) # clear all pins out to prep for sending
+            msg = "Parallel port successfully connected."
+        except:
+            self.pport = None
+            msg = "Parallel port connection failed."
+        self.send_slack_notification(msg)
+        print(msg)
 
     def init_slack(self):
         if os.path.exists("./slack_url.txt"):
