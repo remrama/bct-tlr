@@ -9,6 +9,11 @@
     "task_length-mwt": 5,
     "task_length-soc": 5,
 
+    "soundfile-bct": "eno.wav",
+    "soundfile-svp": "eno.wav",
+    "soundfile-mwt": "eno.wav",
+    "soundfile-soc": "eno.wav",
+
     "screen_number": 0,
     "monitor_info": {
         "distance_cm": 136,

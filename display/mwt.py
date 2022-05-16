@@ -38,6 +38,7 @@ class MindWanderingTask(Game):
 
     def run(self):
         self.init()
+        self.audioStim.play()
         self.show_message_and_wait_for_press(self.prompt1)
         self.task()
         self.quit()

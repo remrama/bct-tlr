@@ -350,6 +350,7 @@ class BreathCountingTask(Game):
     def run(self):
         self.init()
         self.more_stims()
+        self.audioStim.play()
         self.show_instructions()
         self.cycle_counter = 900
         self.reset_cycle()

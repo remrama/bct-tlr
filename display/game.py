@@ -10,7 +10,7 @@ import random
 import inspect
 import requests
 
-from psychopy import core, visual, event, monitors, logging, parallel
+from psychopy import core, visual, sound, event, monitors, logging, parallel
 
 # Load parameters from configuration file.
 with open("./config.json", "r", encoding="utf-8") as f:
@@ -27,6 +27,8 @@ class Game(object):
         self.task_length = 60 * self.task_length_mins
         self.generate_experiment_id()
         self.development_mode = subject_number == 999
+
+        self.soundfile_path = os.path.join("soundfiles", C[f"soundfile-{task_name}"])
 
         self.data_directory = C["data_directory"]
         self.slack_url_path = C["slack_url_path"]
@@ -118,6 +120,7 @@ class Game(object):
             name="ShapeStim-play",
             width=1, height=1, pos=[0, -8],
             fillColor="green", lineColor="black", lineWidth=1)
+        self.audioStim = sound.Sound(self.soundfile_path, name="audioStim")
 
     def send_slack_notification(self, text):
         if not self.development_mode:

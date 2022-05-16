@@ -7,7 +7,7 @@ import random
 
 from game import Game
 
-from psychopy import core, visual, sound, event
+from psychopy import core, visual, event
 
 
 class SerialVisualPresentation(Game):
@@ -32,7 +32,6 @@ class SerialVisualPresentation(Game):
         self.trial_jitter = trial_jitter_secs
         self.practice_requirement = practice_requirement
         self.digit_height = digit_height
-        self.soundfile = soundfile
 
         self.data["practice"] = []
         self.data["task"] = []
@@ -90,12 +89,10 @@ class SerialVisualPresentation(Game):
         # self._generate_random_stim_sequence(practice=True)
         # self.trial_counter = 0
 
-        self.more_stims()
 
     def more_stims(self):
         self.digitStim = visual.TextStim(self.win, name="digitStim",
             pos=[0, 0], height=self.digit_height, color="white")
-        self.audioStim = sound.Sound(self.soundfile, name="audioStim")
 
     def _generate_digit_stim(self):
         if self.digit_sequence:
@@ -124,14 +121,6 @@ class SerialVisualPresentation(Game):
     #     max_trial_count = int(self.task_length / min_trial_length)
     #     self.digit_sequence = np.random.choice(possible_digits,
     #         size=max_trial_count, replace=True, p=weights)
-
-    def play_audio(self):
-        self.show_message_and_wait_for_press(self.preaudio_message)
-        self.fixationStim.draw()
-        self.audioStim.play()
-        self.win.flip()
-        while self.audioStim.status != visual.FINISHED:
-            self.check_for_quit()
 
     def single_trial(self, practice=False):
         # Get the timing for this trial
@@ -224,6 +213,8 @@ class SerialVisualPresentation(Game):
 
     def run(self):
         self.init()
+        self.more_stims()
+        self.audioStim.play()
         self.instructions()
         self.practice()
         self.play_audio()
