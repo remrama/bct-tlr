@@ -8,17 +8,15 @@ class StreamOfConsciousness(Game):
         subject_number,
         session_number,
         task_name="soc",
-        task_length_mins=5,
         ):
         super().__init__(subject_number, session_number, task_name)
 
-        self.task_length = 60 * task_length_mins
         self.letter_height = .3
         self.newline_pad = 0 # guessing here, trial and error
         self.newline_spacing = self.letter_height + self.newline_pad
         self.textbox_size = (15, 15)
 
-        prompt1 = f"""For the next {task_length_mins} minutes, write what about whatever you'd like.
+        prompt1 = f"""For the next {self.task_length_mins} minutes, write what about whatever you'd like.
 
         Try to write continuously about whatever is on your mind.
 

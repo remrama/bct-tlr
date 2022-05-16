@@ -16,7 +16,6 @@ class SerialVisualPresentation(Game):
         subject_number,
         session_number,
         task_name="svp",
-        task_length_mins=10,
         trial_length_secs=4,
         trial_jitter_secs=1,
         target_button="right",
@@ -29,7 +28,6 @@ class SerialVisualPresentation(Game):
         super().__init__(subject_number, session_number, task_name)
 
         # Timing/length (all in seconds)
-        self.task_length = task_length_mins*60
         self.trial_length = trial_length_secs
         self.trial_jitter = trial_jitter_secs
         self.practice_requirement = practice_requirement
@@ -68,7 +66,7 @@ class SerialVisualPresentation(Game):
         self.post_practice_message = """
             Great job!
 
-            The next """ + str(task_length_mins) + """ minutes will be this same task
+            The next """ + str(self.task_length_mins) + """ minutes will be this same task
             but without feedback on your performance.
             """
 
@@ -77,7 +75,7 @@ class SerialVisualPresentation(Game):
 
             Please reflect on those ideas presented to you while responding to the numbers.
 
-            The task will last about """ + str(task_length_mins) + """ minutes.
+            The task will last about """ + str(self.task_length_mins) + """ minutes.
             
             A message will appear on screen to let you know when the time is up.
             If you have any questions, you should ask the experimenter at this time.

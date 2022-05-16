@@ -8,13 +8,10 @@ class MindWanderingTask(Game):
         subject_number,
         session_number,
         task_name="mwt",
-        task_length_mins=5,
         ):
         super().__init__(subject_number, session_number, task_name)
 
-        self.task_length = 60 * task_length_mins
-
-        prompt1 = f"""For the next {task_length_mins} minutes,
+        prompt1 = f"""For the next {self.task_length_mins} minutes,
         just sit here and let your mind wander.
 
         We only ask you keep your eyes open and don't fall asleep.

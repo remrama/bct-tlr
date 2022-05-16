@@ -23,6 +23,8 @@ class Game(object):
         self.subject_number = subject_number
         self.session_number = session_number
         self.task_name = task_name
+        self.task_length_mins = C[f"task_length-{task_name}"]
+        self.task_length = 60 * self.task_length_mins
         self.generate_experiment_id()
         self.development_mode = subject_number == 999
 

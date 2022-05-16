@@ -3,7 +3,11 @@
     "slack_url_path": "./slack_url.txt",
 
     "quit_button": "q",
-    "task_length": 10,
+
+    "task_length-bct": 10,
+    "task_length-svp": 5,
+    "task_length-mwt": 5,
+    "task_length-soc": 5,
 
     "screen_number": 0,
     "monitor_info": {

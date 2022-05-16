@@ -20,7 +20,6 @@ class BreathCountingTask(Game):
         session_number,
         task_name="bct",
         target_digit=9, # number of presses!
-        task_length_mins=10,
         min_press_gap=1, # minimum seconds between presses that triggers warning in practice
         ):
         super().__init__(subject_number, session_number, task_name)
@@ -28,9 +27,7 @@ class BreathCountingTask(Game):
 
         self.task_ended = False
 
-        # Timing/length
         self.target_digit = target_digit
-        self.task_length = task_length_mins * 60
         self.min_press_gap = min_press_gap
 
         self.taskClock = core.Clock() # gets reset when real task starts
@@ -49,7 +46,7 @@ class BreathCountingTask(Game):
 
             Please reflect on those ideas presented to you while counting your breaths.
 
-            The task will last about """ + str(task_length_mins) + """ minutes,
+            The task will last about """ + str(self.task_length_mins) + """ minutes,
             no matter what pace you breathe or how accurate you are at counting.
             
             Remember to sit in a comfortable position, focus primarily on your breathing,

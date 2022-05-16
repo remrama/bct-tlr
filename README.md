@@ -9,11 +9,11 @@ There is one pre-sleep and one post-sleep script.
 Note that session defaults to 1 so is only necessary if there is more than one.
 
 ```bash
-python runall-presleep.py --subject 1 --session 2
+python runall.py --subject 1 --session 2 --pre
 ```
 Sleep
 ```bash
-python runall-postsleep.py --subject 1 --session 2
+python runall.py --subject 1 --session 2 --post
 ```
 
 ### EEG trigger setup
