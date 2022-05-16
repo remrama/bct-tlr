@@ -2,6 +2,22 @@
 
 ## Display code
 
+### Running a participant
+
+There is one pre-sleep and one post-sleep script.
+
+Note that session defaults to 1 so is only necessary if there is more than one.
+
+```bash
+python runall-presleep.py --subject 1 --session 2
+```
+Sleep
+```bash
+python runall-postsleep.py --subject 1 --session 2
+```
+
+### EEG trigger setup
+
 Note the InpOut mess for parallel port setup (if using EEG triggers).
 
 1. https://www.highrez.co.uk/Downloads/InpOut32/default.htm

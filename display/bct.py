@@ -203,7 +203,7 @@ class BreathCountingTask(Game):
                 self.send_to_pport(self.pport_codes[f"bct-{response}"])
                 self.cycle_responses.append(response)
                 self.breath_counter += 1
-                if "target" in response or "reset" in response:
+                if "nontarget" not in response:
                     cycle_ended = True
         # Get cycle stats (accuracy to save and others to slack)
         # Save

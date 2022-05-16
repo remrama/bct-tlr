@@ -83,8 +83,6 @@ class Game(object):
         if self.pport is not None:
             self.pport.setData(portcode)
             self.pport.setData(0)
-        elif self.development_mode:
-            print(portcode)
 
     def init_slack(self):
         if os.path.exists(self.slack_url_path):
