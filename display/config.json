@@ -1,6 +1,6 @@
 {
     "data_directory": "../../data",
-    "soundfile_directory": "./soundfiles",
+    "soundfile_directory": "../../../soundfiles/display-sounds",
     "slack_url_path": "./slack_url.txt",
 
     "quit_button": "q",
@@ -24,18 +24,18 @@
 
     "parallel_port_address": "0x3FD8",
     "parallel_port_codes": {
-        "bct-start": 10,
-        "bct-stop": 11,
-        "bct-target": 12,
-        "bct-nontarget": 13,
-        "bct-reset": 14,
-        "svp-start": 20,
-        "svp-stop": 21,
-        "svp-target": 22,
-        "svp-nontarget": 23,
-        "soc-start": 30,
-        "soc-stop": 31,
-        "mwt-start": 40,
-        "mwt-stop": 41
+        "bct-start": 50,
+        "bct-stop": 51,
+        "bct-target": 52,
+        "bct-nontarget": 53,
+        "bct-reset": 54,
+        "svp-start": 55,
+        "svp-stop": 56,
+        "svp-target": 57,
+        "svp-nontarget": 58,
+        "soc-start": 59,
+        "soc-stop": 60,
+        "mwt-start": 61,
+        "mwt-stop": 62
     }
 }
