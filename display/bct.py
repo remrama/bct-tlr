@@ -337,8 +337,10 @@ class BreathCountingTask(Game):
         self.show_message_and_wait_for_press(self.post_practice_message)
 
     def task(self):
+        self.audioStim.stop()
         self.show_message_and_wait_for_press(self.pretask_message)
         core.wait(1) # just to clear to mouse is lifted before starting
+        self.audioStim.play()
         self.send_slack_notification("Task started")
         self.send_to_pport(self.pport_codes["bct-start"])
         logging.log(level=logging.INFO, msg="Main task started")

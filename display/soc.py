@@ -60,7 +60,7 @@ class StreamOfConsciousness(Game):
     def run(self):
         self.init()
         self.more_stims()
-        self.audioStim.play()
+        # self.audioStim.play()
         self.show_message_and_wait_for_press(self.prompt1)
         self.task()
         self.quit()

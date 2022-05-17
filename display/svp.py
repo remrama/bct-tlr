@@ -175,7 +175,9 @@ class SerialVisualPresentation(Game):
         # the main/full task
         # self._generate_random_stim_sequence()
         # self.trial_counter = 0
+        self.audioStim.stop()
         self.show_message_and_wait_for_press(self.pretask_message)
+        self.audioStim.play()
         self.send_slack_notification("SVP Task started")
         self.send_to_pport(self.pport_codes["svp-start"])
         self.prior_stims = []
