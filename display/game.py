@@ -28,7 +28,7 @@ class Game(object):
         self.generate_experiment_id()
         self.development_mode = subject_number == 999
 
-        self.soundfile_path = os.path.join("soundfiles", C[f"soundfile-{task_name}"])
+        self.soundfile_path = os.path.join(C["soundfile_directory"], C[f"soundfile-{task_name}"])
 
         self.data_directory = C["data_directory"]
         self.slack_url_path = C["slack_url_path"]
