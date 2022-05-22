@@ -62,6 +62,7 @@ class Game(object):
         self.init_slack()
         self.init_pport()
         self.init_exporting()
+        self.export_portcode_legend()
         self.show_message_and_wait_for_press(self.welcome_message)
         self.send_slack_notification("Experiment started")
 
@@ -94,12 +95,26 @@ class Game(object):
                 self.slack_url = f.read().strip()
 
     def init_exporting(self):
-        log_fname = os.path.join(self.data_directory, self.experiment_id+".log")
+        """initialize 2 files for later exporting
+        - logfile with all psychopy stuff
+        - json behavioral results
+        """
+        ### psychopy log
+        log_basename = f"{self.experiment_id}_psychopy.log"
+        log_fname = os.path.join(self.data_directory, log_basename)
         if not self.development_mode:
             assert not os.path.exists(log_fname), f"{log_fname} can't already exist."
         logging.LogFile(log_fname, level=logging.INFO, filemode="w")
+        ### behavior json
         self.json_fname = log_fname.replace(".log", ".json")
-    
+
+    def export_portcode_legend(self):
+        ### portcode legend
+        portcode_basename = f"{self.experiment_id}_portcodes.json"
+        portcode_fname = os.path.join(self.data_directory, portcode_basename)
+        with open(portcode_fname, "w", encoding="utf-8") as f:
+            json.dump(self.pport_codes, f, indent=4, sort_keys=False)
+        
     def init_window(self):
         monitor = monitors.Monitor("testMonitor")
         monitor.setDistance(distance=self.monitor_params["distance_cm"])
