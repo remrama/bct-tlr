@@ -7,9 +7,10 @@ class StreamOfConsciousness(Game):
     def __init__(self,
         subject_number,
         session_number,
+        room_number,
         task_name="soc",
         ):
-        super().__init__(subject_number, session_number, task_name)
+        super().__init__(subject_number, session_number, room_number, task_name)
 
         self.letter_height = .3
         self.newline_pad = 0 # guessing here, trial and error
@@ -73,10 +74,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
+    parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    room_number = args.room
 
-    soc = StreamOfConsciousness(subject_number, session_number)
+    soc = StreamOfConsciousness(subject_number, session_number, room_number)
     soc.run()

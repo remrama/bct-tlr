@@ -10,6 +10,9 @@ import random
 import inspect
 import requests
 
+from psychopy import prefs
+prefs.hardware["audioLib"] = ["PTB"]
+
 from psychopy import core, visual, sound, event, monitors, logging, parallel
 
 # Load parameters from configuration file.
@@ -18,11 +21,13 @@ with open("./config.json", "r", encoding="utf-8") as f:
 
 
 class Game(object):
-    def __init__(self, subject_number, session_number, task_name):
+    def __init__(self, subject_number, session_number, room_number, task_name):
 
         self.subject_number = subject_number
         self.session_number = session_number
         self.task_name = task_name
+        self.room_number = room_number
+
         self.task_length_mins = C[f"task_length-{task_name}"]
         self.task_length = 60 * self.task_length_mins
         self.generate_experiment_id()
@@ -44,7 +49,7 @@ class Game(object):
 
         self.quit_button = C["quit_button"]
 
-        self.monitor_params = C["monitor_info"]
+        self.monitor_params = C["monitor_info"][str(self.room_number)]
         self.window_params = {
             "size": [800, 800], # when not fullscreen
             "color": "gray", # background

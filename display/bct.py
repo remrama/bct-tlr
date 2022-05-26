@@ -18,11 +18,12 @@ class BreathCountingTask(Game):
     def __init__(self,
         subject_number,
         session_number,
+        room_number,
         task_name="bct",
         target_digit=9, # number of presses!
         min_press_gap=1, # minimum seconds between presses that triggers warning in practice
         ):
-        super().__init__(subject_number, session_number, task_name)
+        super().__init__(subject_number, session_number, room_number, task_name)
 
 
         self.task_ended = False
@@ -396,10 +397,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
+    parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    room_number = args.room
 
-    bct = BreathCountingTask(subject_number, session_number)
+    bct = BreathCountingTask(subject_number, session_number, room_number)
     bct.run()

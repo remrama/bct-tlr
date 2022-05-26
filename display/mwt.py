@@ -7,9 +7,10 @@ class MindWanderingTask(Game):
     def __init__(self,
         subject_number,
         session_number,
+        room_number,
         task_name="mwt",
         ):
-        super().__init__(subject_number, session_number, task_name)
+        super().__init__(subject_number, session_number, room_number, task_name)
 
         prompt1 = f"""For the next {self.task_length_mins} minutes,
         just sit here and let your mind wander.
@@ -51,10 +52,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
+    parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    room_number = args.room
 
-    mwt = MindWanderingTask(subject_number, session_number)
+    mwt = MindWanderingTask(subject_number, session_number,room_number)
     mwt.run()

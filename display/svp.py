@@ -15,6 +15,7 @@ class SerialVisualPresentation(Game):
     def __init__(self,
         subject_number,
         session_number,
+        room_number,
         task_name="svp",
         trial_length_secs=4,
         trial_jitter_secs=1,
@@ -25,7 +26,7 @@ class SerialVisualPresentation(Game):
         target_digit=9,
         practice_requirement=5, # number of trials in a row they need to get right to move on
         ):
-        super().__init__(subject_number, session_number, task_name)
+        super().__init__(subject_number, session_number, room_number, task_name)
 
         # Timing/length (all in seconds)
         self.trial_length = trial_length_secs
@@ -231,10 +232,12 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=999)
+    parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    room_number = args.room
 
-    svp = SerialVisualPresentation(subject_number, session_number)
+    svp = SerialVisualPresentation(subject_number, session_number, room_number)
     svp.run()
