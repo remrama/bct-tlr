@@ -5,7 +5,6 @@ Modeled after:
     - Wong et al., 2018         https://doi.org/10.1007/s12671-017-0880-1
 """
 import os
-import inspect
 import argparse
 
 from game import Game
@@ -18,115 +17,59 @@ class BreathCountingTask(Game):
     def __init__(self,
         subject_number,
         session_number,
+        acquisition_code,
         room_number,
+        use_handheld_mouse,
         task_name="bct",
         target_digit=9, # number of presses!
         min_press_gap=1, # minimum seconds between presses that triggers warning in practice
         ):
-        super().__init__(subject_number, session_number, room_number, task_name)
+        super().__init__(subject_number, session_number, acquisition_code, room_number, task_name)
 
 
         self.task_ended = False
 
         self.target_digit = target_digit
+        self.pretarget_digit = target_digit - 1
         self.min_press_gap = min_press_gap
 
         self.taskClock = core.Clock() # gets reset when real task starts
 
         self.min_opacity = .1 # for the text/arrows during practice
 
-        self.post_practice_message = """
-            Great!
+        if use_handheld_mouse:
+            self.response_legend = {
+                0: "nontarget",
+                2: "target",
+                1: "reset"
+            }
+        else:
+            self.response_legend = {
+                0: "nontarget",
+                1: "target",
+                2: "reset"
+            }
 
-            During the full task, you will not have the visual help from the bottom arrows.
-
-            You will only see the center cross, but continue to count your breaths and press the buttons.
-            """
-        self.pretask_message = """
-            The task will begin now.
-
-            Please reflect on those ideas presented to you while counting your breaths.
-
-            The task will last about """ + str(self.task_length_mins) + """ minutes,
-            no matter what pace you breathe or how accurate you are at counting.
-            
-            Remember to sit in a comfortable position, focus primarily on your breathing,
-            and you can press the Scroll Wheel down to reset the counter if you lose track.
-
-            A message will appear on screen to let you know when the time is up.
-            If you have any questions, you should ask the experimenter at this time.
-            """
-        restart_txt = """Let's restart the counter."""
-
-        practice_instructions = """
-            Press either of the Top buttons with breaths 1-""" + str(self.target_digit-1) + """,
-            and the Trigger button with breath """ + str(self.target_digit) + """.
-
-            Press the Scroll Wheel and restart the count at 1 if you lose track.
-            """
-        # practice_instructions = "Breathe slowly and keep count of your breaths.\nPress " + self.nontarget_button.capitalize() + " Arrow on breaths 1-" + str(self.target_digit-1) + ".\nPress " + self.target_button.capitalize() + " Arrow on breath " + str(self.target_digit) + ".\nRestart the count.",
-        
         self.header_text = {
             "fast": "That breath was too fast.",
-            "early": "Don't press the Trigger button until count " + str(self.target_digit) + "." + "\n\n" + restart_txt,
-            "late": "Remember to press the Trigger button on count " + str(self.target_digit) + "." + "\n\n" + "The count will not reset until the Trigger or the Scroll Wheel is pressed.",
-            "instructions": practice_instructions,
+            "early": f"Don't press the Trigger button until count {self.target_digit}.\n\nLet's restart the counter.",
+            "late": f"Remember to press the Trigger button on count {self.target_digit}.\n\nThe count will not reset until the Trigger or the Scroll Wheel is pressed.",
+            "instructions": f"Press either of the Top buttons with breaths 1-{self.pretarget_digit} and the Trigger button with breath {self.target_digit}.\n\nPress the Scroll Wheel and restart the count at 1 if you lose track.",
         }
 
-        self.INSTRUCTIONS_MESSAGES = [
-            """
-            In the next task, we would like you to be aware of your breath.
-            
-            Please be aware of the movement of breath in and out
-            in the space below your nose and above your upper lip
-            (or any other aspect of your breath).
-
-            There's no need to control the breath.
-            Just breathe at a comfortable slow pace.
-            """,
-            """
-            At some point, you may notice
-            your attention has wandered from the breath.
-            
-            That's okay. Just gently place it back on the breath.
-            """,
-            """
-            To help attention stay with the breath,
-            you'll use a small part of your attention
-            to silently count breaths from 1 to """ + str(self.target_digit) + """, again and again.
-            
-            An in and out breath together makes one count.
-
-            Say the count softly in your mind so it only gets a little attention,
-            while most of the attention is on feeling the breath.
-            """,
-            """
-            Press either of the Top buttons on breaths 1-""" + str(self.target_digit-1) + """,
-            and the Trigger button on breath """ + str(self.target_digit) + """.
-            This means you'll be pressing a button with each breath.
-
-            If you find that you have forgotten the count,
-            just press down on the Scroll Wheel and restart the count at 1 with the next breath.
-
-            Do not count the breaths using your fingers but only in your head.
-            """,
-            """
-            We suggest you sit in an upright,
-            relaxed posture that feels comfortable.
-
-            Please keep your eyes at least partially open
-            and directed at the screen during the experiment.
-            """,
+        self.instructions_messages = [
+            "In the next task, we would like you to be aware of your breath.\n\nFocus on the movement of your breath in and out while breathing at a slow, comfortable pace.",
+            "At some point, you may notice your attention has wandered from the breath.\n\nThat's okay. Just gently place it back on the breath.",
+            f"To help attention stay with the breath, use part of your attention to silently count breaths from 1 to {self.target_digit} again and again.",
+            "Say the count softly in your mind (not out loud or with fingers) while most of the attention is on feeling the breath.",
+            f"During counting, press a button with each breath.\n\nPress either of the Top buttons on breaths 1-{self.pretarget_digit} and the Trigger button on breath {self.target_digit}.\n\nIf you find that you have forgotten the count, just press down on the Scroll Wheel and restart the count at 1 with the next breath.",
+            f"Sit in an upright, relaxed posture that feels comfortable.",
         ]
 
-        self.final_message = """
-            Great job :)
-
-            This part of the experiment is over.
-            """
+        self.pretask_message = f"Now please complete the breath-counting task for {self.task_length_mins} minutes without the arrows to help you.\n\nA message will appear when the time is up."
 
 
-    def more_stims(self):
+    def init_more_stims(self):
 
         arrowVert = [ # for upward-facing arrow, centered so it can be rotated
             (-.1,  .2), # top-left tail rect
@@ -181,11 +124,6 @@ class BreathCountingTask(Game):
             self.fixationStim.draw()
             self.win.flip()
 
-    def show_instructions(self):
-        for msg in self.INSTRUCTIONS_MESSAGES:
-            self.show_message_and_wait_for_press(msg)
-
-
     def reset_cycle(self):
         self.cycle_counter += 1
         self.breath_counter = 1
@@ -217,7 +155,7 @@ class BreathCountingTask(Game):
             self.digitsArrows[current_index].setColor(arrow_color)
             self.digitsArrows[current_index].setOpacity(1)
             self.digitsTexts[current_index].setOpacity(1)
-        self.topText.text = inspect.cleandoc(self.header_text[text_key])
+        self.topText.text = self.header_text[text_key]
         self.topText.setColor(text_color)
 
     def collect_response(self):
@@ -236,11 +174,7 @@ class BreathCountingTask(Game):
                 self.flutter_fixation()
                 clicked_index = presses.index(True)
                 rt = timestamps[clicked_index]
-                response = {
-                    0: "nontarget",
-                    2: "target",
-                    1: "reset"
-                }[clicked_index]
+                self.response_legend[clicked_index]
                 # left_clicked, right_clicked, _ = presses
                 # left_rt, right_rt, _ = timestamps
                 if not self.passed_practice:
@@ -320,7 +254,7 @@ class BreathCountingTask(Game):
         # for tstim, astim in zip(self.digitsTexts, self.digitsArrows):
         #     tstim.setAutoDraw(True)
         #     astim.setOpacity(True)
-        self.topText.text = inspect.cleandoc(self.header_text["instructions"])
+        self.topText.text = self.header_text["instructions"]
         self.adjust_practice_stim_autodraws(autodraw=True)
         while not self.passed_practice:
             # reset helper stims
@@ -335,7 +269,6 @@ class BreathCountingTask(Game):
             core.wait(1)
             self.check_practice_passed()
         self.adjust_practice_stim_autodraws(autodraw=False)
-        self.show_message_and_wait_for_press(self.post_practice_message)
 
     def task(self):
         self.audioStim.stop()
@@ -352,12 +285,15 @@ class BreathCountingTask(Game):
 
     def run(self):
         self.init()
-        self.more_stims()
-        self.audioStim.play()
-        self.show_instructions()
-        self.cycle_counter = 900
-        self.reset_cycle()
-        self.practice()
+        self.init_more_stims()
+        if self.acquisition_code == "pre":
+            self.audioStim.play()
+            self.show_instructions()
+            self.cycle_counter = 900
+            self.reset_cycle()
+            self.practice()
+        else:
+            self.passed_practice = True
         self.cycle_counter = 0
         self.reset_cycle()
         self.task()
@@ -397,12 +333,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
+    parser.add_argument("--acq", type=str, default="pre", choices=["pre", "post"])
     parser.add_argument("--room", type=int, default=207, choices=[0, 207])
+    parser.add_argument("--handheld", action="store_true", help="Use handheld mouse.")
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    acquisition_code = args.acq
     room_number = args.room
+    use_handheld_mouse = args.handheld
 
-    bct = BreathCountingTask(subject_number, session_number, room_number)
+    bct = BreathCountingTask(subject_number, session_number, acquisition_code, room_number, use_handheld_mouse)
     bct.run()

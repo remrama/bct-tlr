@@ -7,33 +7,27 @@ class StreamOfConsciousness(Game):
     def __init__(self,
         subject_number,
         session_number,
+        acquisition_code,
         room_number,
         task_name="soc",
         ):
-        super().__init__(subject_number, session_number, room_number, task_name)
+        super().__init__(subject_number, session_number, acquisition_code, room_number, task_name)
 
         self.letter_height = .3
         self.newline_pad = 0 # guessing here, trial and error
         self.newline_spacing = self.letter_height + self.newline_pad
         self.textbox_size = (15, 15)
 
-        prompt1 = f"""For the next {self.task_length_mins} minutes, write what about whatever you'd like.
+        self.instructions_messages = [
+            f"For the next {self.task_length_mins} minutes, write what about whatever you'd like.",
+            f"Try to write continuously about whatever is on your mind.\n\nDo not use abbreviations and try your best to spell correctly.\n\nOnce you are ready, press the button below."
+        ]
 
-        Try to write continuously about whatever is on your mind.
-
-        Do not use abbreviations and try your best to spell correctly.
-
-        Once you are ready, press the button below.
-        """
-        self.prompt1 = inspect.cleandoc(prompt1)
-        self.prompt2 = "Write continuously and avoid abbreviations."
-
-
-    def more_stims(self):
+    def init_more_stims(self):
         self.timerText = visual.TextStim(self.win)
         self.promptText = visual.TextStim(self.win)
         self.editableText = visual.TextBox2(self.win,
-            text="Write something", font="Open Sans",
+            text="Begin writing...", font="Open Sans",
             size=self.textbox_size,
             letterHeight=self.letter_height,
             anchor="center", alignment="center",
@@ -60,9 +54,8 @@ class StreamOfConsciousness(Game):
 
     def run(self):
         self.init()
-        self.more_stims()
-        # self.audioStim.play()
-        self.show_message_and_wait_for_press(self.prompt1)
+        self.init_more_stims()
+        self.show_instructions()
         self.task()
         self.quit()
 
@@ -74,12 +67,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
+    parser.add_argument("--acq", type=str, default="pre", choices=["pre", "post"])
     parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    acquisition_code = args.acq
     room_number = args.room
 
-    soc = StreamOfConsciousness(subject_number, session_number, room_number)
+    soc = StreamOfConsciousness(subject_number, session_number, acquisition_code, room_number)
     soc.run()

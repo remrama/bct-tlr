@@ -15,6 +15,7 @@ class SerialVisualPresentation(Game):
     def __init__(self,
         subject_number,
         session_number,
+        acquisition_code,
         room_number,
         task_name="svp",
         trial_length_secs=4,
@@ -26,7 +27,7 @@ class SerialVisualPresentation(Game):
         target_digit=9,
         practice_requirement=5, # number of trials in a row they need to get right to move on
         ):
-        super().__init__(subject_number, session_number, room_number, task_name)
+        super().__init__(subject_number, session_number, acquisition_code, room_number, task_name)
 
         # Timing/length (all in seconds)
         self.trial_length = trial_length_secs
@@ -45,41 +46,14 @@ class SerialVisualPresentation(Game):
         self.nontarget_button = nontarget_button
         self.trial_keylist = [target_button, nontarget_button]
 
-        self.instructions_text = [
-            """
-            In this task, we would like you to pay attention to a stream of numbers.
-            
-            When you see a """ + str(target_digit) + """ pop up, press the """ + self.target_button.capitalize() + """ Arrow button.
-            For all other numbers, press the """ + self.nontarget_button.capitalize() + """ Arrow button.
-            
-            You should be pressing a button for every number that pops up.
-            """,
+        self.instructions_messages = [
+            "In this task, we would like you to pay attention to a stream of numbers.",
+            f"You should press a button for every number that pops up.\n\nWhen you see a {self.target_button} pop up, press the {self.target_button.capitalize()} Arrow.\nFor all other numbers, press the {self.nontarget_button.capitalize()} Arrow."
         ]
 
-        self.practice_instructions_text = "Press " + self.target_button.capitalize() + " Arrow when you see a " + str(target_digit) + ".\nPress " + self.nontarget_button.capitalize() + " Arrow for all other numbers."
+        self.instructions_header = "Press " + self.target_button.capitalize() + " Arrow when you see a " + str(target_digit) + ".\nPress " + self.nontarget_button.capitalize() + " Arrow for all other numbers."
 
-        self.preaudio_message = """
-            Before starting the task, please relax
-            and listen to the following short recording.
-            """
-
-        self.post_practice_message = """
-            Great job!
-
-            The next """ + str(self.task_length_mins) + """ minutes will be this same task
-            but without feedback on your performance.
-            """
-
-        self.pretask_message = """
-            The task will begin now.
-
-            Please reflect on those ideas presented to you while responding to the numbers.
-
-            The task will last about """ + str(self.task_length_mins) + """ minutes.
-            
-            A message will appear on screen to let you know when the time is up.
-            If you have any questions, you should ask the experimenter at this time.
-            """
+        self.pretask_message = f"Now please complete the number-stream task for {self.task_length_mins} minutes without feedback to help you.\n\nA message will appear when the time is up."
 
         self.nontarget_digits = nontarget_digits
         self.target_digit = target_digit
@@ -91,7 +65,7 @@ class SerialVisualPresentation(Game):
         # self.trial_counter = 0
 
 
-    def more_stims(self):
+    def init_more_stims(self):
         self.digitStim = visual.TextStim(self.win, name="digitStim",
             pos=[0, 0], height=self.digit_height, color="white")
 
@@ -188,16 +162,14 @@ class SerialVisualPresentation(Game):
             self.save_data()
         self.send_to_pport(self.pport_codes["svp-stop"])
 
-
     def practice(self):
         self.send_slack_notification("SVP Practice started")
-        self.topText.text = self.practice_instructions_text
+        self.topText.text = self.instructions_header
         self.topText.setAutoDraw(True)
         while not self.passed_practice:
             self.single_trial(practice=True)
             self.check_practice_passed()
         self.topText.setAutoDraw(False)
-        self.show_message_and_wait_for_press(self.post_practice_message)
 
     def check_practice_passed(self):
         responses = self.data["practice"]
@@ -209,18 +181,16 @@ class SerialVisualPresentation(Game):
             if pct_correct >= .7:
                 self.passed_practice = True
 
-    def instructions(self):
-        for txt in self.instructions_text:
-            self.show_message_and_wait_for_press(txt)
-
 
     def run(self):
         self.init()
-        self.more_stims()
-        self.audioStim.play()
-        self.instructions()
-        self.practice()
-        self.play_audio()
+        self.init_more_stims()
+        if self.acquisition_code == "pre":
+            self.audioStim.play()
+            self.show_instructions()
+            self.practice()
+        else:
+            self.passed_practice = True
         self.task()
         self.quit()
 
@@ -232,12 +202,14 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=999)
+    parser.add_argument("--acq", type=str, default="pre", choices=["pre", "post"])
     parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
     subject_number = args.subject
     session_number = args.session
+    acquisition_code = args.acq
     room_number = args.room
 
-    svp = SerialVisualPresentation(subject_number, session_number, room_number)
+    svp = SerialVisualPresentation(subject_number, session_number, acquisition_code, room_number)
     svp.run()

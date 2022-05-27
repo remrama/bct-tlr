@@ -21,10 +21,11 @@ with open("./config.json", "r", encoding="utf-8") as f:
 
 
 class Game(object):
-    def __init__(self, subject_number, session_number, room_number, task_name):
+    def __init__(self, subject_number, session_number, acquisition_code, room_number, task_name):
 
         self.subject_number = subject_number
         self.session_number = session_number
+        self.acquisition_code = acquisition_code
         self.task_name = task_name
         self.room_number = room_number
 
@@ -44,7 +45,7 @@ class Game(object):
         self.data = {}
         self.passed_practice = False
 
-        self.welcome_message = "Thank you for participating.\n\nLeft-click in the green box to continue"
+        self.welcome_message = "Thank you for participating.\n\nClick in the green box to continue"
         self.exit_message = "Thank you.\n\nYour responses have been recorded."
 
         self.quit_button = C["quit_button"]
@@ -63,7 +64,7 @@ class Game(object):
     def init(self):
         self.init_window()
         self.init_stimuli()
-        self.mouse = event.Mouse(self.win)
+        self.init_mouse()
         self.init_slack()
         self.init_pport()
         self.init_exporting()
@@ -75,8 +76,13 @@ class Game(object):
         self.experiment_id = "_".join([
             f"sub-{self.subject_number:03d}",
             f"ses-{self.session_number:03d}",
-            f"task-{self.task_name}"
+            f"task-{self.task_name}",
+            f"acq-{self.acquisition_code}",
         ])
+
+    def init_mouse(self):
+        self.mouse = event.Mouse(self.win)
+        self.mouse.setVisible(False)
 
     def init_pport(self):
         try:
@@ -174,14 +180,14 @@ class Game(object):
     def show_message_and_wait_for_press(self, text):
         self.middleText.text = inspect.cleandoc(text)
         self.middleText.draw()
-        self.nextButton.setOpacity(.2)
+        self.nextButton.setOpacity(.1)
         self.nextButton.draw()
         self.win.flip()
         core.wait(3)
         self.nextButton.setOpacity(1)
         event.clearEvents(eventType="mouse")
-        xpos = random.uniform(-10, 10)
-        ypos = random.uniform(-10, 10)
+        xpos = random.uniform(-2, 2)
+        ypos = random.uniform(-10, -6)
         self.mouse.setPos([xpos, ypos])
         self.mouse.setVisible(True)
         while not self.mouse.isPressedIn(self.nextButton, buttons=[0]):
@@ -190,3 +196,7 @@ class Game(object):
             self.win.flip()
             self.check_for_quit()
         self.mouse.setVisible(False)
+
+    def show_instructions(self):
+        for msg in self.instructions_messages:
+            self.show_message_and_wait_for_press(msg)
