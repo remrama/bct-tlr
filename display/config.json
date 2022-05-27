@@ -1,6 +1,6 @@
 {
     "data_directory": "../../data",
-    "soundfile_directory": "G:/My Drive/projects/bct-tmr/soundfiles/display-sounds",
+    "soundfile_directory": "../../../soundfiles/display-sounds",
     "slack_url_path": "./slack_url.txt",
 
     "quit_button": "q",

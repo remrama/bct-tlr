@@ -1,4 +1,3 @@
-import inspect
 from psychopy import visual, event, core
 from game import Game
 
