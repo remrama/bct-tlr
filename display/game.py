@@ -54,7 +54,7 @@ class Game(object):
         self.window_params = {
             "size": [800, 800], # when not fullscreen
             "color": "gray", # background
-            "screen": C["screen_number"],
+            "screen": 0,
             "units": "deg",
             "fullscr": self.development_mode^1,
             "allowGUI": False,
@@ -128,23 +128,23 @@ class Game(object):
         
     def init_window(self):
         monitor = monitors.Monitor("testMonitor")
-        monitor.setDistance(distance=self.monitor_params["distance_cm"])
-        monitor.setWidth(width=self.monitor_params["width_cm"])
+        monitor.setDistance(self.monitor_params["distance_cm"])
+        monitor.setWidth(self.monitor_params["width_cm"])
         monitor.setSizePix(self.monitor_params["size_pix"])
-        self.win = visual.Window(monitor="testMonitor", **self.window_params)
+        self.win = visual.Window(monitor=monitor, **self.window_params)
 
     def init_stimuli(self):
         self.topText = visual.TextStim(self.win, name="topTextStim",
-            pos=[0, 4], height=.5, wrapWidth=20, color="white")
+            pos=[0, 3], height=.5, wrapWidth=20, color="white")
         self.middleText = visual.TextStim(self.win, name="middleTextStim",
             pos=[0, 0], height=.5, wrapWidth=20, color="white")
         self.bottomText = visual.TextStim(self.win, name="bottomTextStim",
-            pos=[0, -4], height=.5, wrapWidth=20, color="white")
+            pos=[0, -3], height=.5, wrapWidth=20, color="white")
         self.fixationStim = visual.GratingStim(self.win, name="fixationStim",
             mask="cross", tex=None, size=[1, 1])
         self.nextButton = visual.Rect(self.win,
             name="ShapeStim-play",
-            width=1, height=1, pos=[0, -8],
+            width=1, height=1, pos=[0, -5],
             fillColor="green", lineColor="black", lineWidth=1)
         self.audioStim = sound.Sound(self.soundfile_path, name="audioStim")
 

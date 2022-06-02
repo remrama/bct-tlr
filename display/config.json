@@ -15,7 +15,6 @@
     "soundfile-mwt": "eno-med1.wav",
     "soundfile-soc": "eno-med1.wav",
 
-    "screen_number": 0,
     "monitor_info": {
         "0": {
             "distance_cm": 136,
@@ -23,9 +22,9 @@
             "size_pix": [1024, 768]
         },
         "207": {
-            "distance_cm": 136,
-            "width_cm": 85.7,
-            "size_pix": [1024, 768]
+            "distance_cm": 56,
+            "width_cm": 25.5,
+            "size_pix": [1680, 1050]
         }
     },
 

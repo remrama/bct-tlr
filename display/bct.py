@@ -40,21 +40,21 @@ class BreathCountingTask(Game):
         if use_handheld_mouse:
             self.response_legend = {
                 0: "nontarget",
-                2: "target",
-                1: "reset"
+                1: "reset",
+                1: "target",
             }
         else:
             self.response_legend = {
                 0: "nontarget",
-                1: "target",
-                2: "reset"
+                1: "reset",
+                2: "target",
             }
 
         self.header_text = {
             "fast": "That breath was too fast.",
-            "early": f"Don't press the Trigger button until count {self.target_digit}.\n\nLet's restart the counter.",
-            "late": f"Remember to press the Trigger button on count {self.target_digit}.\n\nThe count will not reset until the Trigger or the Scroll Wheel is pressed.",
-            "instructions": f"Press either of the Top buttons with breaths 1-{self.pretarget_digit} and the Trigger button with breath {self.target_digit}.\n\nPress the Scroll Wheel and restart the count at 1 if you lose track.",
+            "early": f"Don't press the Top button until count {self.target_digit}.\n\nLet's restart the counter.",
+            "late": f"Remember to press the Top button on count {self.target_digit}.\n\nThe count will not reset until the Top button or the Scroll Wheel is pressed.",
+            "instructions": f"Press the Trigger button with breaths 1-{self.pretarget_digit} and the Trigger button with breath {self.target_digit}.\n\nPress the Scroll Wheel and restart the count at 1 if you lose track.",
         }
 
         self.instructions_messages = [
@@ -62,7 +62,7 @@ class BreathCountingTask(Game):
             "At some point, you may notice your attention has wandered from the breath.\n\nThat's okay. Just gently place it back on the breath.",
             f"To help attention stay with the breath, use part of your attention to silently count breaths from 1 to {self.target_digit} again and again.",
             "Say the count softly in your mind (not out loud or with fingers) while most of the attention is on feeling the breath.",
-            f"During counting, press a button with each breath.\n\nPress either of the Top buttons on breaths 1-{self.pretarget_digit} and the Trigger button on breath {self.target_digit}.\n\nIf you find that you have forgotten the count, just press down on the Scroll Wheel and restart the count at 1 with the next breath.",
+            f"During counting, press a button with each breath.\n\nPress the Trigger button on breaths 1-{self.pretarget_digit} and either of the Top buttons on breath {self.target_digit}.\n\nIf you find that you have forgotten the count, just press down on the Scroll Wheel and restart the count at 1 with the next breath.",
             f"Sit in an upright, relaxed posture that feels comfortable.",
         ]
 
