@@ -174,7 +174,7 @@ class BreathCountingTask(Game):
                 self.flutter_fixation()
                 clicked_index = presses.index(True)
                 rt = timestamps[clicked_index]
-                self.response_legend[clicked_index]
+                response = self.response_legend[clicked_index]
                 # left_clicked, right_clicked, _ = presses
                 # left_rt, right_rt, _ = timestamps
                 if not self.passed_practice:
