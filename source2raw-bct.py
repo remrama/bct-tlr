@@ -1,0 +1,226 @@
+"""Clean the BCT task data.
+Go from raw psychopy log file output to usable dataframe in BIDS format.
+"""
+
+from pathlib import Path
+
+from bids.layout import parse_file_entities
+import pandas as pd
+
+import utils
+
+import dmlab
+
+source_dir = utils.config.get("Paths", "source")
+raw_dir = utils.config.get("Paths", "raw")
+
+
+# file_list = utils.find_source_files("bct", "json")
+file_list = Path(source_dir).glob("sub-*/sub-*_psychopy.log")
+
+# global_metadata = utils.load_config(as_object=False)["global_bids_metadata"]
+global_metadata = {
+    "InstitutionName": "Northwestern University",
+    "InstitutionDepartmentName": "Department of Psychology"
+}
+
+
+task_metadata = {
+    "TaskName": "Breath Counting Task",
+    "TaskDescription": "",
+    "Instructions": [
+        "line 1",
+        "line 2"
+    ]
+}
+
+column_metadata = {
+
+    "cycle": {
+        "LongName": "Cycle count",
+        "Description": "Indicates the cycle number, which ends on either a target or reset press.",
+        "Dtype": "int"
+    },
+
+    "press": {
+        "LongName": "Press count",
+        "Description": "Indicates the press count within each cycle",
+        "Dtype": "int",
+        "Levels": {
+            "nontarget": "Breaths 1-8",
+            "target": "Breath 9"
+        }
+    },
+
+    "response": {
+        "LongName": "Button response",
+        "Description": "Indicator of what button was pushed",
+        "Dtype": "str",
+        "Levels": {
+            "left": "participant estimated a nontarget trial",
+            "right": "participant estimated a target trial",
+            "space": "participant lost count and reset counter"
+        }
+    },
+
+    "response_time": {
+        "Description": "Indicator of time between prior and current response",
+        "Dtype": "float",
+        "Units": "milliseconds"
+    },
+
+    "accuracy": {
+        "LongName": "Press accuracy",
+        "Description": "Indicator of press-level accuracy",
+        "Levels": {
+            "correct": "participant responded with target on target breath or nontarget on pre-target breaths",
+            "undershoot": "participant responded with target before target breath",
+            "overshoot": "participant responded with target or nontarget after target breath",
+            "selfcaught": "participant lost count and reset counter"
+        }
+    },
+
+    # "cycle_accuracy": {
+    #     "LongName": "Cycle accuracy",
+    #     "Description": "Indicator of cycle-level accuracy",
+    #     "dtype": "str",
+    #     "Levels": {
+    #         "correct": "participant estimated a nontarget trial",
+    #         "undershoot": "participant estimated a target trial",
+    #         "overshoot": "participant lost count and reset counter",
+    #         "selfcaught": "participant lost count and reset counter"
+    #     }
+    # }
+
+}
+
+
+
+# column_names = list(column_metadata.keys())
+# column_names.remove("press_accuracy")
+
+sidecar = task_metadata | global_metadata | column_metadata
+
+
+target = 9
+target_response = "Right"
+nontarget_response = "Left"
+reset_response = "space"
+def press_accuracy(row):
+    """Works as cycle accuracy too if take last row of each cycle.
+    """
+    if row["response"] == "reset":
+        return "selfcaught"
+    elif row["response"] == "target" and row["press"] == target:
+        return "correct"
+    elif row["press"] > target:
+        return "overshoot"
+    elif row["press"] == target and row["response"] == "nontarget":
+        return "overshoot"
+    elif row["press"] < target and row["response"] == "nontarget":
+        return "correct"
+    elif row["press"] < target and row["response"] == "target":
+        return "undershoot"
+    else:
+        raise ValueError("Should never get here")
+
+
+
+for filepath in file_list:
+
+    # Load data.
+    df = pd.read_csv(filepath, sep="\t", names=["timestamp", "level", "info"])
+    df["level"] = df["level"].str.strip() # psychopy has a space after these for some reason
+
+    # Restrict to after the task started and before it ended.
+    assert df["info"].eq("Main task started").sum() == 1
+    assert df["info"].str.endswith("Your responses have been recorded.'").sum() == 1
+    start_msg_row = df["info"].eq("Main task started").argmax()
+    end_msg_row = df["info"].str.endswith("Your responses have been recorded.'").argmax()
+    starttime = df.loc[start_msg_row, "timestamp"]
+    df = df[start_msg_row+1:end_msg_row]
+
+
+    # Get rid of non-data and button-up messages (so it's only button presses)
+    df = df.query("level=='DATA'")
+
+    # Sometimes there are different amounts of spaces between words in info.
+    # Get rid of excess text to avoid this.
+    assert df["info"].str.startswith("Mouse:").all()
+    df = df[df["info"].str.contains("button down")]
+    df["info"] = df["info"].str.split("Mouse:").str[1].str.split("button").str[0].str.strip()
+
+    # Add columns
+    cycle_counter = 1
+    def cycle_incrementer(x):
+        global cycle_counter
+        if x == "Right":
+            cycle_counter += 1
+        return cycle_counter
+    df["cycle"] = df["info"].shift(1, fill_value="Left").apply(cycle_incrementer)
+
+    press_counter = 0
+    def press_cycler(x):
+        global press_counter
+        if x == "Left":
+            press_counter += 1
+        else:
+            press_counter = 1
+        return press_counter
+
+    # Shift forward to look behind.
+    df["press"] = df["info"].shift(1, fill_value="Left").apply(press_cycler)
+
+    # # Convert timestamp to response time?
+    # df["response_time"] = df["response_time"].diff().fillna(df["response_time"][0]).mul(1000)
+
+    # Remove final trial if it wasn't finished.
+    n_cycles = df["cycle"].max()
+    if not df.query(f"cycle.eq({n_cycles})")["info"].is_unique:
+        df = df.query(f"cycle.lt({n_cycles})")
+
+    df = df.rename(columns={"info": "response"})
+    # df["response"] = df["response"].str.lower()
+    df["response"] = df["response"].replace({nontarget_response: "nontarget", target_response: "target"})
+
+    df["timestamp"] = df["timestamp"].sub(starttime)
+    df["accuracy"] = df.apply(press_accuracy, axis=1)
+
+
+    df = df[["cycle", "press", "response", "timestamp", "accuracy"]]
+
+    entities = parse_file_entities(filepath)
+    subject_id = "sub-" + entities["subject"]
+    task_id = "task-" + entities["task"]
+    acquisition_id = "acq-" + entities["acquisition"]
+    suffix_id = "beh"
+
+    stem = "_".join([subject_id, task_id, acquisition_id, suffix_id])
+    export_path_data = Path(raw_dir) / subject_id / suffix_id / f"{stem}.tsv"
+    export_path_sidecar = export_path_data.with_suffix(".json")
+    export_path_data.parent.mkdir(parents=True, exist_ok=True)
+
+    df = df.to_csv(export_path_data, sep="\t", index=False, float_format="%.2f")
+    dmlab.io.export_json(sidecar, export_path_sidecar)
+
+    # with open(file, "r", encoding="utf-8") as f:
+    #     subject_data = json.load(f)
+    # # convert cycle number strings to integers
+    # subject_data = { int(k): v for k, v in subject_data.items() }
+    # # remove practice cycles
+    # subject_data = { k: v for k, v in subject_data.items() if k < 900 }
+    # # remove final trial if it wasn't finished
+    # subject_data = { k: v for k, v in subject_data.items() if len(v) > 0 and v[-1][0] != "left" }
+    # # wrangle data
+    # cycle_list = [ v for v in subject_data.values() ]
+    # rows = [ [i+1, j+1] + resp for i, cycle in enumerate(cycle_list) for j, resp in enumerate(cycle) ]
+    # df = pd.DataFrame(rows, columns=column_names)
+    # df["response_time"] = df["response_time"].diff().fillna(df["response_time"][0]).mul(1000)
+    # # [ r0[:3]+[r1[3]-r0[3]] for r0, r1 in zip(rows[:-1], rows[1:]) ]
+    # sub, ses, task = utils.filename2labels(file)
+    # basename = os.path.basename(file).replace(".json", "_beh.tsv").replace("_ses-001", "")
+    # data_filepath = os.path.join(utils.load_config().bids_root, sub, "beh", basename)
+    # utils.make_pathdir_if_not_exists(data_filepath)
+    # df.to_csv(data_filepath, index=False, sep="\t", float_format="%.0f")
+    # utils.pretty_sidecar_export(sidecar, data_filepath)
+
