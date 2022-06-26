@@ -54,7 +54,7 @@ class BreathCountingTask(Game):
             "fast": "That breath was too fast.",
             "early": f"Don't press the Top button until count {self.target_digit}.\n\nLet's restart the counter.",
             "late": f"Remember to press the Top button on count {self.target_digit}.\n\nThe count will not reset until the Top button or the Scroll Wheel is pressed.",
-            "instructions": f"Press the Trigger button with breaths 1-{self.pretarget_digit} and the Trigger button with breath {self.target_digit}.\n\nPress the Scroll Wheel and restart the count at 1 if you lose track.",
+            "instructions": f"Press the Trigger button with breaths 1-{self.pretarget_digit} and a Top button with breath {self.target_digit}.\n\nPress the Scroll Wheel and restart the count at 1 if you lose track.",
         }
 
         self.instructions_messages = [
