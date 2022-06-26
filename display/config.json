@@ -1,6 +1,6 @@
 {
-    "data_directory": "../../data",
-    "soundfile_directory": "../../../soundfiles/display-sounds",
+    "data_directory": "../../sourcedata",
+    "soundfile_directory": "../../stimuli",
     "slack_url_path": "./slack_url.txt",
 
     "quit_button": "q",
