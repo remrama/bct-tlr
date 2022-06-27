@@ -186,9 +186,9 @@ class Game(object):
         core.wait(3)
         self.nextButton.setOpacity(1)
         event.clearEvents(eventType="mouse")
-        xpos = random.uniform(-2, 2)
-        ypos = random.uniform(-10, -6)
-        self.mouse.setPos([xpos, ypos])
+        # xpos = random.uniform(-2, 2)
+        # ypos = random.uniform(-10, -6)
+        # self.mouse.setPos([xpos, ypos])
         self.mouse.setVisible(True)
         while not self.mouse.isPressedIn(self.nextButton, buttons=[0]):
             self.middleText.draw()

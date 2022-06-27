@@ -41,7 +41,7 @@ class BreathCountingTask(Game):
             self.response_legend = {
                 0: "nontarget",
                 1: "reset",
-                1: "target",
+                2: "target",
             }
         else:
             self.response_legend = {
