@@ -135,11 +135,11 @@ class Game(object):
 
     def init_stimuli(self):
         self.topText = visual.TextStim(self.win, name="topTextStim",
-            pos=[0, 3], height=.5, wrapWidth=20, color="white")
+            pos=[0, 3], height=.5, wrapWidth=10, color="white")
         self.middleText = visual.TextStim(self.win, name="middleTextStim",
-            pos=[0, 0], height=.5, wrapWidth=20, color="white")
+            pos=[0, 0], height=.5, wrapWidth=10, color="white")
         self.bottomText = visual.TextStim(self.win, name="bottomTextStim",
-            pos=[0, -3], height=.5, wrapWidth=20, color="white")
+            pos=[0, -3], height=.5, wrapWidth=10, color="white")
         self.fixationStim = visual.GratingStim(self.win, name="fixationStim",
             mask="cross", tex=None, size=[1, 1])
         self.nextButton = visual.Rect(self.win,
