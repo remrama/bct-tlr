@@ -48,10 +48,10 @@ class SerialVisualPresentation(Game):
 
         self.instructions_messages = [
             "In this task, we would like you to pay attention to a stream of numbers.",
-            f"You should press a button for every number that pops up.\n\nWhen you see a {self.target_button} pop up, press the {self.target_button.capitalize()} Arrow.\nFor all other numbers, press the {self.nontarget_button.capitalize()} Arrow."
+            f"You should press a button for every number that pops up.\n\nWhen you see a {target_digit} on screen, press the {self.target_button.capitalize()} Arrow.\nFor all other numbers, press the {self.nontarget_button.capitalize()} Arrow."
         ]
 
-        self.instructions_header = "Press " + self.target_button.capitalize() + " Arrow when you see a " + str(target_digit) + ".\nPress " + self.nontarget_button.capitalize() + " Arrow for all other numbers."
+        self.instructions_header = f"Press {self.target_button.capitalize()} Arrow when you see a {target_digit}.\nPress {self.nontarget_button.capitalize()} Arrow for all other numbers."
 
         self.pretask_message = f"Now please complete the number-stream task for {self.task_length_mins} minutes without feedback to help you.\n\nA message will appear when the time is up."
 
