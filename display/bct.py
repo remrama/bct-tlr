@@ -94,13 +94,13 @@ class BreathCountingTask(Game):
                 pos=[digit_xpositions[i], ARROWS_YLOC],
                 size=1,
                 ori= 90 if i+1==self.target_digit else -90,
-                fillColor="black", lineColor="black")
+                fillColor="black", lineColor="black", autoLog=False)
             for i in range(self.target_digit) ]
         self.digitsTexts = [ visual.TextStim(self.win,
                 name=f"Digit{i+1}TextStim",
                 text=i+1,
                 pos=[digit_xpositions[i], TEXT_YLOC],
-                color="black")
+                color="black", autoLog=False)
             for i in range(self.target_digit) ]
 
 

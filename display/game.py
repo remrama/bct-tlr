@@ -141,11 +141,11 @@ class Game(object):
         self.bottomText = visual.TextStim(self.win, name="bottomTextStim",
             pos=[0, -3], height=.5, wrapWidth=10, color="white")
         self.fixationStim = visual.GratingStim(self.win, name="fixationStim",
-            mask="cross", tex=None, size=[1, 1])
+            mask="cross", tex=None, size=[1, 1], autoLog=False)
         self.nextButton = visual.Rect(self.win,
             name="ShapeStim-play",
             width=1, height=1, pos=[0, -5],
-            fillColor="green", lineColor="black", lineWidth=1)
+            fillColor="green", lineColor="black", lineWidth=1, autoLog=False)
         self.audioStim = sound.Sound(self.soundfile_path, name="audioStim")
 
     def send_slack_notification(self, text):
