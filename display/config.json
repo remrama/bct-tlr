@@ -10,10 +10,10 @@
     "task_length-mwt": 5,
     "task_length-soc": 5,
 
-    "soundfile-bct": "eno-lux3.wav",
-    "soundfile-svp": "eno-med1.wav",
-    "soundfile-mwt": "eno-med1.wav",
-    "soundfile-soc": "eno-med1.wav",
+    "soundfile-bct": "lux3.wav",
+    "soundfile-svp": "med1.wav",
+    "soundfile-mwt": "med1.wav",
+    "soundfile-soc": "med1.wav",
 
     "monitor_info": {
         "0": {
