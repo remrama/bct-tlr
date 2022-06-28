@@ -66,7 +66,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--subject", type=int, default=999)
     parser.add_argument("--session", type=int, default=1)
-    parser.add_argument("--acq", type=str, default="pre", choices=["pre", "post"])
+    parser.add_argument("--acq", type=str, required=True, choices=["pre", "post"])
     parser.add_argument("--room", type=int, default=207, choices=[0, 207])
     args = parser.parse_args()
 
