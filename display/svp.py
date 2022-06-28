@@ -7,7 +7,7 @@ import random
 
 from game import Game
 
-from psychopy import core, visual, event
+from psychopy import core, visual, event, logging
 
 
 class SerialVisualPresentation(Game):
@@ -155,12 +155,12 @@ class SerialVisualPresentation(Game):
         self.audioStim.play()
         self.send_slack_notification("SVP Task started")
         self.send_to_pport(self.pport_codes["svp-start"])
+        logging.log(level=logging.INFO, msg="Main task started")
         self.prior_stims = []
         self.taskClock.reset()
         while self.taskClock.getTime() < self.task_length-self.trial_length:
             self.single_trial()
             self.save_data()
-        self.send_to_pport(self.pport_codes["svp-stop"])
 
     def practice(self):
         self.send_slack_notification("SVP Practice started")

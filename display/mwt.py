@@ -1,4 +1,4 @@
-from psychopy import visual, event, core
+from psychopy import visual, event, core, logging
 from game import Game
 
 class MindWanderingTask(Game):
@@ -23,6 +23,7 @@ class MindWanderingTask(Game):
     def task(self):
         self.topText.text = self.header_text
         self.send_to_pport(self.pport_codes["mwt-start"])
+        logging.log(level=logging.INFO, msg="Main task started")
         self.clockCountdown = core.CountdownTimer(start=self.task_length)
         while self.clockCountdown.getTime() > 0:
             secs_left = round(self.clockCountdown.getTime())
