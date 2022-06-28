@@ -318,7 +318,6 @@ class BreathCountingTask(Game):
         self.taskClock.reset()
         while not self.task_ended:
             self.single_cycle()
-        self.send_to_pport(self.pport_codes["bct-stop"])
 
     def run(self):
         self.init()

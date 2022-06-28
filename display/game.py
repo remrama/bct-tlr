@@ -161,6 +161,8 @@ class Game(object):
             json.dump(self.data, f, indent=4, sort_keys=False)
 
     def quit(self, manual=False):
+        logging.log(level=logging.INFO, msg="Main task ended")
+        self.send_to_pport(self.pport_codes[f"{self.task_name}-stop"])
         slack_msg = "**MANUAL QUIT**" if manual else "Experiment ended"
         self.send_slack_notification(slack_msg)
         if not manual:
