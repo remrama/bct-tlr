@@ -1,58 +1,41 @@
-"""Convert sourcedata EEG files (Neuroscan) to relevant BIDS raw files.
-Each file needs a:
+"""Convert sourcedata .cnt EEG file (Neuroscan)
+to multiple raw .fif EEG BIDS-formatted files
+and their corresponding information files.
+
+Clean a participant's raw PSG file.
+Break it into the different tasks,
+preprocess it, rename the triggers,
+add sleep stage annotations, etc.
+
+Each session gets:
     _eeg.fif          - PSG data
     _eeg.json         - PSG sidecar info
     _channels.tsv     - channel information
+    _events.tsv       - stimulus/trigger information
 
-Clean a participant's raw PSG file. Break it into the different tasks, preprocess it, rename the triggers, add sleep stage annotations, etc.
-
-trim to sleep (breaking into tasks)
-
-```bash
-# Convert source .cnt file (Neuroscan) to multiple preprocessed .fif files (MNE)
-python eeg-cnt2fif.py --subject 1 --session 1   # => data/derivatives/sub-001/eeg/sub-001_ses-001_task-nap_eeg.fif
-                                                # => data/derivatives/sub-001/eeg/sub-001_ses-001_task-nap_eeg.json
-                                                # => data/derivatives/sub-001/eeg/sub-001_ses-001_task-nap_events.tsv
-                                                # => data/derivatives/sub-001/eeg/sub-001_ses-001_task-nap_channels.tsv
-                                                # [same for tasks bct and svp]
-
-# Convert source json behavior files to tsv
-python beh-source2data.py --subject 1 --session 1   # => data/derivatives/sub-001/behavior/sub-001_ses-001_task-bct_beh.tsv
-```
-
-## Random notes look away
-
-- keep events.tsv and eeg.fif separate. because not all people's analyses will take fif w the builtin annotations. build BIDS-ey pipelines/scripts using that setup, so it's easy to share later.
-
-- source2bids file to preprocessing
-    - take master eeg json info and check if anything changed in subject tracking sheet, making new ones for that person
-    - trimming/splitting into separate task files
-    - adding time/date/gender/age?
-    - preprocessing
-    - converting annotations to events files (removing annotations)
-    - autorejecting or marking bads
-    - no downsampling
-- just use "bids_root_dir" or something and rest should be known/implied
-- for each study then, the only hard part is getting it formatted into eeg/events/etc files but then smooth sailing after that.
-- maybe save mne-report for each subject at this stage
-- add some PSG/sleep stuff?
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_hypno.tsv (needs onset in case not at start of sleep)
-    - or _hypno.txt and _hyno.json where json has (rater, eeg/eog used, classifier, etc., could be in the tsv file too, with rater as column names, certified or not)
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_spindles.tsv
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_slowwaves.tsv
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_rems.tsv
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_sleepquality.tsv
-    - derivatives/yasa/sub-001/sub-001_ses-001_task-nap_log.log (turn on verbose)
-now i can have just plot-single and plot-group functions
-
+python eeg-cnt2fif.py --subject 1 --session 1
+=> sub-001/eeg/sub-001_ses-001_task-nap_eeg.fif
+=> sub-001/eeg/sub-001_ses-001_task-nap_eeg.json
+=> sub-001/eeg/sub-001_ses-001_task-nap_events.tsv
+=> sub-001/eeg/sub-001_ses-001_task-nap_events.json
+=> sub-001/eeg/sub-001_ses-001_task-nap_channels.tsv
+=> sub-001/eeg/sub-001_ses-001_task-nap_channels.json
+=> ... [same for tasks bct and svp]
 """
-import os
-import mne
-import yasa
+
 import argparse
+from os import getcwd
+from os.path import relpath
+from pathlib import Path
+
+import mne
 import numpy as np
 import pandas as pd
+import yasa
+
 import utils
+
+import dmlab
 
 source_dir = utils.config.get("Paths", "source")
 raw_dir = utils.config.get("Paths", "raw")
@@ -68,7 +51,7 @@ ecg_channels = utils.config.getlist("PSG", "ecg")
 emg_channels = utils.config.getlist("PSG", "emg")
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, default=901)
+parser.add_argument("--participant", type=int, default=906)
 parser.add_argument("--session", type=int, default=1)
 args = parser.parse_args()
 
@@ -79,19 +62,20 @@ new_extension = "fif"
 participant_id = f"sub-{participant_number:03d}"
 session_id = f"ses-{session_number:03d}"
 import_basename = f"{participant_id}_{session_id}_eeg.{eeg_file_extension}"
-export_basename = f"{participant_id}_task-sleep_eeg.{new_extension}"
-eeg_import_path = os.path.join(source_dir, participant_id, import_basename)
-eeg_export_path = os.path.join(raw_dir, participant_id, export_basename)
-eeg_sidecar_path = eeg_export_path.replace(f".{new_extension}", ".json")
-channels_tsv_path = eeg_sidecar_path.replace("_eeg.json", "_channels.tsv")
-events_tsv_path = eeg_sidecar_path.replace("_eeg.json", "_events.tsv")
-events_sidecar_path = events_tsv_path.replace(".tsv", ".json")
-channels_sidecar_path = channels_tsv_path.replace(".tsv", ".json")
+export_basename = f"{participant_id}_task-nap_eeg.{new_extension}"
+import_path = Path(source_dir) / participant_id / import_basename
+eeg_path = Path(raw_dir) / participant_id / export_basename
+eeg_sidecar_path = eeg_path.with_suffix(".json")
+channels_path = str(eeg_path.with_suffix(".tsv")).replace("_eeg", "_channels")
+events_path = str(eeg_path.with_suffix(".tsv")).replace("_eeg", "_events")
+events_sidecar_path = Path(events_path).with_suffix(".json")
+channels_sidecar_path = Path(channels_path).with_suffix(".json")
 
-utils.make_pathdir_if_not_exists(eeg_export_path)
+eeg_path.parent.mkdir(parents=True, exist_ok=True)
 
-# Load raw EEG file
-raw = mne.io.read_raw_cnt(eeg_import_path,
+
+# Load raw Neuroscan EEG file
+raw = mne.io.read_raw_cnt(import_path,
     eog=eog_channels, misc=misc_channels,
     ecg=ecg_channels, emg=emg_channels,
     data_format="auto", date_format="mm/dd/yy",
@@ -101,7 +85,7 @@ raw = mne.io.read_raw_cnt(eeg_import_path,
 ############################### Preprocessing (minimal)
 
 # # Trim to sleep
-# raw.crop(tmin, tmax)
+# raw.crop(tmin=0, tmax=600)
 
 # # Filter
 # # Apply a bandpass filter from 0.1 to 40 Hz
@@ -186,25 +170,19 @@ eeg_sidecar_info = {
 
 ######### Events
 
-## Update original annotations descriptions for better events output
-event_desc = {
-    100: "lights on",
-    115: "lights on",
-    118: "lights on",
-    120: "lights on",
-    122: "lights on",
-    191: "lights on",
-    200: "lights on",
-    202: "lights off",
-    203: "lights off",
-    204: "lights off",
-}
-
-
+# Load all the portcodes
+event_desc = utils.get_all_portcodes(participant_number, session_number)
 event_id = { v: k for k, v in event_desc.items() }
 
+# Load stimuli filenames.
+cue_paths = Path(stimuli_dir).glob("*_Cue*.wav")
+biocal_paths = Path(stimuli_dir).joinpath("biocals").glob("*.mp3")
+stimuli_abspaths = list(cue_paths) + list(biocal_paths)
+stimuli_relpaths = [ relpath(p, getcwd()) for p in stimuli_abspaths ]
+
 ## (this might be unsafe)
-raw.annotations.description = np.array([ event_desc[int(x)] for x in raw.annotations.description ])
+raw.annotations.description = np.array([ event_desc[int(x)]
+    for x in raw.annotations.description if int(x) in event_desc ])
 
 # Add custom mapping to avoid arbitrary ints
 
@@ -217,9 +195,13 @@ events_from_annot, event_dict = mne.events_from_annotations(raw, event_id=event_
 
 events_df = pd.DataFrame(events_from_annot, columns=["onset", "duration", "value"])
 
+def get_stim_name(x):
+    for p in stimuli_relpaths:
+        if x in p:
+            return p
+
 events_df["description"] = events_df["value"].map(event_desc)
-events_df["stim_file"] = events_df["description"].apply(
-    lambda x: x if x in stimuli_dir else None)
+events_df["stim_file"] = events_df["description"].apply(get_stim_name)
 
 events_sidecar_info = {
     "onset": {
@@ -259,9 +241,9 @@ events_sidecar_info = {
 
 ######################################## Export everything
 
-utils.write_pretty_json(eeg_sidecar_info, eeg_sidecar_path)
-channels_df.to_csv(channels_tsv_path, index=False, sep="\t")
-utils.write_pretty_json(channels_sidecar_info, channels_sidecar_path)
-events_df.to_csv(events_tsv_path, index=False, sep="\t")
-utils.write_pretty_json(events_sidecar_info, events_sidecar_path)
-raw.save(eeg_export_path, overwrite=True)
+dmlab.io.export_json(channels_sidecar_info, channels_sidecar_path)
+dmlab.io.export_json(events_sidecar_info, events_sidecar_path)
+dmlab.io.export_json(eeg_sidecar_info, eeg_sidecar_path)
+dmlab.io.export_dataframe(channels_df, channels_path)
+dmlab.io.export_dataframe(events_df, events_path)
+raw.save(eeg_path, overwrite=True)
