@@ -16,7 +16,7 @@ raw_dir = utils.config.get("Paths", "raw")
 
 
 # file_list = utils.find_source_files("bct", "json")
-file_list = Path(source_dir).glob("sub-*/sub-*_psychopy.log")
+file_list = Path(source_dir).glob("sub-906/sub-*_psychopy.log")
 
 # global_metadata = utils.load_config(as_object=False)["global_bids_metadata"]
 global_metadata = {
@@ -103,8 +103,8 @@ sidecar = task_metadata | global_metadata | column_metadata
 
 
 target = 9
-target_response = "Right"
-nontarget_response = "Left"
+target_response = "right"
+nontarget_response = "left"
 reset_response = "space"
 def press_accuracy(row):
     """Works as cycle accuracy too if take last row of each cycle.
@@ -134,42 +134,40 @@ for filepath in file_list:
 
     # Restrict to after the task started and before it ended.
     assert df["info"].eq("Main task started").sum() == 1
-    assert df["info"].str.endswith("Your responses have been recorded.'").sum() == 1
+    assert df["info"].eq("Main task ended").sum() == 1
     start_msg_row = df["info"].eq("Main task started").argmax()
-    end_msg_row = df["info"].str.endswith("Your responses have been recorded.'").argmax()
+    end_msg_row = df["info"].eq("Main task ended").argmax()
     starttime = df.loc[start_msg_row, "timestamp"]
     df = df[start_msg_row+1:end_msg_row]
-
 
     # Get rid of non-data and button-up messages (so it's only button presses)
     df = df.query("level=='DATA'")
 
     # Sometimes there are different amounts of spaces between words in info.
     # Get rid of excess text to avoid this.
-    assert df["info"].str.startswith("Mouse:").all()
-    df = df[df["info"].str.contains("button down")]
-    df["info"] = df["info"].str.split("Mouse:").str[1].str.split("button").str[0].str.strip()
+    assert df["info"].str.startswith("Keypress:").all()
+    df["info"] = df["info"].str.split("Keypress: ").str[1].str.strip()
 
     # Add columns
     cycle_counter = 1
     def cycle_incrementer(x):
         global cycle_counter
-        if x == "Right":
+        if x == target_response:
             cycle_counter += 1
         return cycle_counter
-    df["cycle"] = df["info"].shift(1, fill_value="Left").apply(cycle_incrementer)
+    df["cycle"] = df["info"].shift(1, fill_value=nontarget_response).apply(cycle_incrementer)
 
     press_counter = 0
     def press_cycler(x):
         global press_counter
-        if x == "Left":
+        if x == nontarget_response:
             press_counter += 1
         else:
             press_counter = 1
         return press_counter
 
     # Shift forward to look behind.
-    df["press"] = df["info"].shift(1, fill_value="Left").apply(press_cycler)
+    df["press"] = df["info"].shift(1, fill_value=nontarget_response).apply(press_cycler)
 
     # # Convert timestamp to response time?
     # df["response_time"] = df["response_time"].diff().fillna(df["response_time"][0]).mul(1000)
@@ -185,8 +183,7 @@ for filepath in file_list:
 
     df["timestamp"] = df["timestamp"].sub(starttime)
     df["accuracy"] = df.apply(press_accuracy, axis=1)
-
-
+    
     df = df[["cycle", "press", "response", "timestamp", "accuracy"]]
 
     entities = parse_file_entities(filepath)
