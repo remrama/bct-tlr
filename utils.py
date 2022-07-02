@@ -18,14 +18,12 @@ config = configparser.ConfigParser(converters={"list": json.loads})
 config.read("./config.ini")
 
 
-def _check_bids_root_exists():
-    # make sure BIDS root directory exists
+def load_participants_file():
     bids_root = config.get("Paths", "bids_root")
+    filepath = Path(bids_root) / "participants.tsv"
+    return pd.read_csv(filepath, index_col="participant_id", sep="\t")
 
 
-
-####################################### Portcode functions
-####################################### Portcode functions
 ####################################### Portcode functions
 
 def get_tmr_codes(participant, session):

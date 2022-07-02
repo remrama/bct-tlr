@@ -41,8 +41,8 @@ source_dir = utils.config.get("Paths", "source")
 raw_dir = utils.config.get("Paths", "raw")
 stimuli_dir = utils.config.get("Paths", "stimuli")
 eeg_file_extension = utils.config.get("PSG", "file_extension")
-reference_channel = utils.config.get("PSG", "reference")
-ground_channel = utils.config.get("PSG", "ground")
+# reference_channel = utils.config.get("PSG", "reference")
+# ground_channel = utils.config.get("PSG", "ground")
 notch_frequency = utils.config.getint("PSG", "notch_frequency")
 eeg_channels = utils.config.getlist("PSG", "eeg")
 eog_channels = utils.config.getlist("PSG", "eog")
@@ -97,6 +97,11 @@ raw = mne.io.read_raw_cnt(import_path,
 
 
 ################################# Generate channel info file
+
+participants = utils.load_participants_file()
+reference_channel = participants.loc[participant_id, "eeg_reference"]
+ground_channel = participants.loc[participant_id, "eeg_ground"]
+
 
 # Compose channels dataframe
 # n_total_channels = raw.channel_count
