@@ -7,12 +7,6 @@ Break it into the different tasks,
 preprocess it, rename the triggers,
 add sleep stage annotations, etc.
 
-Each session gets:
-    _eeg.fif          - PSG data
-    _eeg.json         - PSG sidecar info
-    _channels.tsv     - channel information
-    _events.tsv       - stimulus/trigger information
-
 python eeg-cnt2fif.py --subject 1 --session 1
 => sub-001/eeg/sub-001_ses-001_task-nap_eeg.fif
 => sub-001/eeg/sub-001_ses-001_task-nap_eeg.json
@@ -96,10 +90,9 @@ raw = mne.io.read_raw_cnt(import_path,
     data_format="auto", date_format="mm/dd/yy",
     preload=False, verbose=None)
 
-raw.set_meas_date(measurement_date.to_pydatetime())
+# Load TMR logfile
+tmr_log = utils.load_tmr_logfile(participant_number, session_number)
 
-# set_meas_date
-# If datetime object, it must be timezone-aware and in UTC.
 
 
 ############################### Preprocessing (minimal)
@@ -164,47 +157,78 @@ eeg_sidecar = utils.generate_eeg_bids_sidecar(
 
 ######### Events
 
-# Load all the portcodes
-event_desc = utils.get_all_portcodes(participant_number, session_number)
-event_id = { v: k for k, v in event_desc.items() }
-
 # Load stimuli filenames.
 cue_paths = Path(stimuli_dir).glob("*_Cue*.wav")
 biocal_paths = Path(stimuli_dir).joinpath("biocals").glob("*.mp3")
 stimuli_abspaths = list(cue_paths) + list(biocal_paths)
 stimuli_relpaths = [ relpath(p, getcwd()) for p in stimuli_abspaths ]
 
-## (this might be unsafe)
-raw.annotations.description = np.array([ event_desc[int(x)]
-    for x in raw.annotations.description if int(x) in event_desc ])
+# Load all the portcodes
+event_code2str = utils.get_all_portcodes(participant_number, session_number)
+# event_id = { v: k for k, v in event_desc.items() }
+## temp fix
+# event_code2str[204] = "Note"
 
-# Add custom mapping to avoid arbitrary ints
+# Generate events dataframe
+## to_data_frame puts onset as a timestamp which is dumb
+## events_df = raw.annotations.to_data_frame()
+events_array, event_code2mne = mne.events_from_annotations(raw, verbose=0)
+events_df = pd.DataFrame(events_array, columns=["onset", "duration", "value"])
 
-
-### It can be passed as event_id=custom_mapping
-### to handle the mapping simultaneously
-### for epoching analyses, need triggers
-### represented as "Events" rather than "Annotations"
-events_from_annot, event_dict = mne.events_from_annotations(raw, event_id=event_id)
-
-# # Remove existing annotations (to avoid redundancy).
-# while raw.annotations:
-#     raw.annotations.delete(0)
-
-events_df = pd.DataFrame(events_from_annot, columns=["onset", "duration", "value"])
+# Manipulate/add info.
+# event_mne2code = { v: int(k) for k, v in event_code2mne.items() }
+# event_mne2str = { k: event_code2str[v] for k, v in event_mne2code.items() }
+event_mne2str = { v: event_code2str[int(k)] for k, v in event_code2mne.items() }
+# events_df["value"] = events_df["value"].map(event_mne2code)
+events_df["description"] = events_df["value"].map(event_mne2str)
 
 # mne returns onset in unit of sample number, change to seconds
 events_df["onset"] /= raw.info["sfreq"]
 
 def get_stim_name(x):
     for p in stimuli_relpaths:
-        if x in p:
+        if x.split()[-1] in p:
             return p
 
-events_df["description"] = events_df["value"].map(event_desc)
 events_df["stim_file"] = events_df["description"].apply(get_stim_name)
+events_df["description"] = events_df["description"].apply(lambda x: "Biocals" if x.startswith("Biocals") else x)
+events_df["description"] = events_df["description"].apply(lambda x: "Cue" if "Cue" in x else x)
+
+events_df["next_description"] = events_df["description"].shift(-1, fill_value="FILL")
+events_df["next_onset"] = events_df["onset"].shift(-1, fill_value="FILL")
+def get_duration(row):
+    if row["next_description"] == "Stopped cue":
+        return row["next_onset"] - row["onset"]
+    else:
+        return row["duration"]
+
+events_df["duration"] = events_df.apply(get_duration, axis=1)
+events_df = events_df.drop(columns=["next_description", "next_onset"])
+events_df = events_df.query("description.ne('Stopped cue')")
+
+new_unique_values = { d: i+1 for i, d in enumerate(events_df["description"].unique()) }
+events_df["value"] = events_df["description"].map(new_unique_values)
+
+
+# Remove existing annotations (to avoid redundancy).
+while raw.annotations:
+    raw.annotations.delete(0)
+
+# ## (this might be unsafe)
+# raw.annotations.description = np.array([ event_desc[int(x)]
+#     for x in raw.annotations.description if int(x) in event_desc ])
 
 events_sidecar = utils.generate_eeg_events_bids_sidecar()
+
+
+# Could get measurement date from participants file,
+# but to get very specific timestamps and link to TMR log file,
+# pick one of the TMR log timestamps arbitrarily and set it
+# relative to that.
+# raw.set_meas_date(measurement_date.to_pydatetime())
+# set_meas_date
+# If datetime object, it must be timezone-aware and in UTC.
+
 
 
 ######################################## Break up task files
@@ -227,8 +251,8 @@ if "LightsOff" in events.index and "LightsOn" in events.index:
     dmlab.io.export_json(events_sidecar, events_path.with_suffix(".json"))
     dmlab.io.export_json(channels_sidecar, channels_path.with_suffix(".json"))
 
-biocals_tmin = events.loc["Biocals OpenEyes", "onset"]
-prenap_events = events.query(f"onset.lt({biocals_tmin})")
+# biocals_tmin = events.loc["Biocals OpenEyes", "onset"]
+prenap_events = events.query(f"onset.lt({nap_tmin})")
 postnap_events = events.query(f"onset.gt({nap_tmax})")
 path_adjuster = lambda p, t, a: p.as_posix().replace("task-nap", f"task-{t}_acq-{p}")
 

@@ -25,7 +25,6 @@ def load_participants_file():
     df = pd.read_csv(filepath, index_col="participant_id", parse_dates=["timestamp"], sep="\t")
     # MNE wants UTC and check fails if UTC is a string rather than datetime timezone.
     # https://github.com/mne-tools/mne-python/blob/3c23f13c0262118d075de0719248409bdc838982/mne/utils/numerics.py#L1036
-    # df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert("UTC")
     df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
     return df
 
@@ -146,8 +145,7 @@ def generate_eeg_events_bids_sidecar(**kwargs):
 # Portcode functions
 ####################################################
 
-def get_tmr_codes(participant, session):
-    #### Get event codes from TWC GUI log.
+def load_tmr_logfile(participant, session):
 
     source_dir = config.get("Paths", "source")
     tmr_log_path = Path(source_dir).joinpath(
@@ -155,12 +153,19 @@ def get_tmr_codes(participant, session):
         f"sub-{participant:03d}_ses-{session:03d}_tmr.log",
     )
 
-    ser = pd.read_csv(tmr_log_path,
+    df = pd.read_csv(tmr_log_path,
         names=["timestamp", "msg_level", "msg"],
-        usecols=["timestamp", "msg"], index_col="timestamp",
-        parse_dates=["timestamp"]
-    ).squeeze("columns"
-    ).str.strip()
+        parse_dates=["timestamp"])
+    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+    df["msg"] = df["msg"].str.strip()
+    return df
+
+
+def get_tmr_codes(participant, session):
+    #### Get event codes from TWC GUI log.
+
+    df = load_tmr_logfile(participant, session)
+    ser = df.set_index("timestamp")["msg"]
 
     # Reduce to only events with portcodes
     assert not ser.str.contains("Failed portcode").any()
@@ -175,13 +180,15 @@ def get_tmr_codes(participant, session):
         portcode = int(portcode_str.split()[-1])
 
         # Ignore portcodes for stopping cues and dream reports.
-        if description.startswith("Stopped"):
-            continue
+        if description.startswith("Stopped cue"):
+            description = "Stopped cue"
+        elif description == "StoppedDreamReport":
+            continue # skip for now
         elif description.startswith("Played cue"):
             description = description.split()[-1]
 
         if portcode in codes:
-            assert codes[portcode] == description
+            assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
         else:
             codes[portcode] = description
 
