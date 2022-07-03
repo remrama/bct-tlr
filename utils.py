@@ -5,6 +5,7 @@ import sys
 sys.path.append("C:/Users/malle/packages/dmlab")
 
 import configparser
+from datetime import timezone
 import json
 from pathlib import Path
 
@@ -21,10 +22,129 @@ config.read("./config.ini")
 def load_participants_file():
     bids_root = config.get("Paths", "bids_root")
     filepath = Path(bids_root) / "participants.tsv"
-    return pd.read_csv(filepath, index_col="participant_id", sep="\t")
+    df = pd.read_csv(filepath, index_col="participant_id", parse_dates=["timestamp"], sep="\t")
+    # MNE wants UTC and check fails if UTC is a string rather than datetime timezone.
+    # https://github.com/mne-tools/mne-python/blob/3c23f13c0262118d075de0719248409bdc838982/mne/utils/numerics.py#L1036
+    # df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert("UTC")
+    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+    return df
 
 
-####################################### Portcode functions
+####################################################
+# Functions to generate BIDS sidecars
+####################################################
+
+def generate_eeg_bids_sidecar(
+        task_name,
+        task_description,
+        task_instructions,
+        reference_channel,
+        ground_channel,
+        sampling_frequency,
+        recording_duration,
+        n_eeg_channels,
+        n_eog_channels,
+        n_ecg_channels,
+        n_emg_channels,
+        n_misc_channels,
+        **kwargs
+    ):
+    defaults = {
+        "TaskName": task_name,
+        "TaskDescription": task_description,
+        "Instructions": task_instructions,
+        "InstitutionName": "Northwestern University",
+        "Manufacturer": "Neuroscan",
+        "ManufacturersModelName": "tbd",
+        "CapManufacturer": "tbd",
+        "CapManufacturersModelName": "tbd",
+        "PowerLineFrequency": 60,
+        "EEGPlacementScheme": "10-20",
+        "EEGReference": f"single electrode placed on {reference_channel}",
+        "EEGGround": f"single electrode placed on {ground_channel}",
+        "SamplingFrequency": sampling_frequency,
+        "EEGChannelCount": n_eeg_channels,
+        "EOGChannelCount": n_eog_channels,
+        "ECGChannelCount": n_ecg_channels,
+        "EMGChannelCount": n_emg_channels,
+        "MiscChannelCount": n_misc_channels,
+        "TriggerChannelCount": 0,
+        "SoftwareFilters": "tbd",
+        "HardwareFilters": {
+            "tbd": {
+                "tbd": "tbd",
+                "tbd": "tbd"
+            }
+        },
+        "RecordingType": "continuous",
+        "RecordingDuration": recording_duration,
+    }
+    defaults.update(kwargs)
+    return defaults
+
+def generate_eeg_channels_bids_sidecar(**kwargs):
+    defaults = {
+        "name": "See BIDS spec",
+        "type": "See BIDS spec",
+        "units": "See BIDS spec",
+        "description": "See BIDS spec",
+        "sampling_frequency": "See BIDS spec",
+        "reference": "See BIDS spec",
+        "low_cutoff": "See BIDS spec",
+        "high_cutoff": "See BIDS spec",
+        "notch": "See BIDS spec",
+        "status": "See BIDS spec",
+        "status_description": "See BIDS spec",
+        "RespirationHardware": "tbd", # seems like a good thing to add??
+    }
+    defaults.update(kwargs)
+    return defaults
+
+def generate_eeg_events_bids_sidecar(**kwargs):
+    defaults = {
+        "onset": {
+            "LongName": "Onset (in seconds) of the event",
+            "Description": "Onset (in seconds) of the event"
+        },
+        "duration": {
+            "LongName": "Duration of the event (measured from onset) in seconds",
+            "Description": "Duration of the event (measured from onset) in seconds"
+        },
+        "value": {
+            "LongName": "Marker/trigger value associated with the event",
+            "Description": "Marker/trigger value associated with the event"
+        },
+        "description": {
+            "LongName": "Value description",
+            "Description": "Readable explanation of value markers column",
+        },
+        "trial_type": {
+            "LongName": "General event category",
+            "Description": "Very different event types are included, so this clarifies",
+            "Levels": {
+                "tmr": "A sound cue for targeted memory reactivation",
+                "staging": "A sleep stage",
+                "misc": "Things like lights-on lights-off or note"
+            }
+        },
+        "StimulusPresentation": {
+            "OperatingSystem": "Linux Ubuntu 18.04.5",
+            "SoftwareName": "Psychtoolbox",
+            "SoftwareRRID": "SCR_002881",
+            "SoftwareVersion": "3.0.14",
+            "Code": "doi:10.5281/zenodo.3361717"
+        }
+    }
+    defaults.update(kwargs)
+    # Make sure stim presentation info is last (only one that's not a column).
+    defaults["StimulusPresentation"] = defaults.pop("StimulusPresentation")
+    return defaults
+
+
+
+####################################################
+# Portcode functions
+####################################################
 
 def get_tmr_codes(participant, session):
     #### Get event codes from TWC GUI log.

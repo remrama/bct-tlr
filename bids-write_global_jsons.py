@@ -2,12 +2,14 @@
     root/dataset_description.json
     root/task-nap.json
 """
-import os
+from pathlib import Path
 
 import utils
 
+import dmlab
 
-bids_root = config.bids_root
+
+bids_root = utils.config.get("Paths", "bids_root")
 
 dataset_description = {
     "Name": "BCT-TMR",
@@ -51,5 +53,5 @@ dataset_description = {
     ]
 }
 
-export_filepath = os.path.join(bids_root, "dataset_description.json")
-utils.write_pretty_json(export_filepath)
+export_path = Path(bids_root) / "dataset_description.json"
+dmlab.io.export_json(export_path)

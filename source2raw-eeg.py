@@ -37,18 +37,6 @@ import utils
 
 import dmlab
 
-source_dir = utils.config.get("Paths", "source")
-raw_dir = utils.config.get("Paths", "raw")
-stimuli_dir = utils.config.get("Paths", "stimuli")
-eeg_file_extension = utils.config.get("PSG", "file_extension")
-# reference_channel = utils.config.get("PSG", "reference")
-# ground_channel = utils.config.get("PSG", "ground")
-notch_frequency = utils.config.getint("PSG", "notch_frequency")
-eeg_channels = utils.config.getlist("PSG", "eeg")
-eog_channels = utils.config.getlist("PSG", "eog")
-misc_channels = utils.config.getlist("PSG", "misc")
-ecg_channels = utils.config.getlist("PSG", "ecg")
-emg_channels = utils.config.getlist("PSG", "emg")
 
 parser = argparse.ArgumentParser()
 parser.add_argument("--participant", type=int, default=906)
@@ -58,21 +46,48 @@ args = parser.parse_args()
 participant_number = args.participant
 session_number = args.session
 
-new_extension = "fif"
+
+#############################################
+# Setup
+#############################################
+
+# Load parameters from configuration file.
+source_dir = utils.config.get("Paths", "source")
+raw_dir = utils.config.get("Paths", "raw")
+stimuli_dir = utils.config.get("Paths", "stimuli")
+eeg_source_extension = utils.config.get("PSG", "source_extension")
+eeg_raw_extension = utils.config.get("PSG", "raw_extension")
+# reference_channel = utils.config.get("PSG", "reference")
+# ground_channel = utils.config.get("PSG", "ground")
+notch_frequency = utils.config.getint("PSG", "notch_frequency")
+eeg_channels = utils.config.getlist("PSG", "eeg")
+eog_channels = utils.config.getlist("PSG", "eog")
+misc_channels = utils.config.getlist("PSG", "misc")
+ecg_channels = utils.config.getlist("PSG", "ecg")
+emg_channels = utils.config.getlist("PSG", "emg")
+
+# Define parameters that require manipulation.
 participant_id = f"sub-{participant_number:03d}"
 session_id = f"ses-{session_number:03d}"
-import_basename = f"{participant_id}_{session_id}_eeg.{eeg_file_extension}"
-export_basename = f"{participant_id}_task-nap_eeg.{new_extension}"
+import_basename = f"{participant_id}_{session_id}_eeg{eeg_source_extension}"
 import_path = Path(source_dir) / participant_id / import_basename
-eeg_path = Path(raw_dir) / participant_id / export_basename
-eeg_sidecar_path = eeg_path.with_suffix(".json")
-channels_path = str(eeg_path.with_suffix(".tsv")).replace("_eeg", "_channels")
-events_path = str(eeg_path.with_suffix(".tsv")).replace("_eeg", "_events")
-events_sidecar_path = Path(events_path).with_suffix(".json")
-channels_sidecar_path = Path(channels_path).with_suffix(".json")
+participant_parent = Path(raw_dir) / participant_id
 
-eeg_path.parent.mkdir(parents=True, exist_ok=True)
+# Nap i/o
+task = "nap"
+eeg_name = f"{participant_id}_task-{task}_eeg{eeg_raw_extension}"
+eeg_path = participant_parent / eeg_name
+events_path = participant_parent / eeg_path.with_suffix(".tsv").name.replace("_eeg", "_events")
+channels_path = participant_parent / eeg_path.with_suffix(".tsv").name.replace("_eeg", "_channels")
+# channels_path = str(eeg_path.with_suffix(".tsv")).replace("_eeg", "_channels")
+# Sidecar paths can be created on the fly using .with_suffix
 
+# Create participant raw directory if not present already.
+participant_parent.mkdir(parents=True, exist_ok=True)
+
+# Load participants file.
+participants = utils.load_participants_file()
+measurement_date = participants.loc[participant_id, "timestamp"]
 
 # Load raw Neuroscan EEG file
 raw = mne.io.read_raw_cnt(import_path,
@@ -80,6 +95,11 @@ raw = mne.io.read_raw_cnt(import_path,
     ecg=ecg_channels, emg=emg_channels,
     data_format="auto", date_format="mm/dd/yy",
     preload=False, verbose=None)
+
+raw.set_meas_date(measurement_date.to_pydatetime())
+
+# set_meas_date
+# If datetime object, it must be timezone-aware and in UTC.
 
 
 ############################### Preprocessing (minimal)
@@ -98,7 +118,6 @@ raw = mne.io.read_raw_cnt(import_path,
 
 ################################# Generate channel info file
 
-participants = utils.load_participants_file()
 reference_channel = participants.loc[participant_id, "eeg_reference"]
 ground_channel = participants.loc[participant_id, "eeg_ground"]
 
@@ -123,55 +142,25 @@ channels_info = {
 }
 
 channels_df = pd.DataFrame.from_dict(channels_info)
+channels_sidecar = utils.generate_eeg_channels_bids_sidecar()
 
-channels_sidecar_info = {
-    "name": "See BIDS spec",
-    "type": "See BIDS spec",
-    "units": "See BIDS spec",
-    "description": "See BIDS spec",
-    "sampling_frequency": "See BIDS spec",
-    "reference": "See BIDS spec",
-    "low_cutoff": "See BIDS spec",
-    "high_cutoff": "See BIDS spec",
-    "notch": "See BIDS spec",
-    "status": "See BIDS spec",
-    "status_description": "See BIDS spec",
-    "RespirationHardware": "tbd", # seems like a good thing to add??
-}
 
 
 ############################################ Generate EEG sidecar file
-eeg_sidecar_info = {
-    "TaskName": "sleep",
-    "TaskDescription": "Participants went to sleep and TMR cues were played quietly during slow-wave sleep",
-    "Instructions": "Go to sleep",
-    "InstitutionName": "Northwestern University",
-    "Manufacturer": "Neuroscan",
-    "ManufacturersModelName": "tbd",
-    "CapManufacturer": "tbd",
-    "CapManufacturersModelName": "tbd",
-    "PowerLineFrequency": 60,
-    "EEGPlacementScheme": "10-20",
-    "EEGReference": f"single electrode placed on {reference_channel}",
-    "EEGGround": f"single electrode placed on {ground_channel}",
-    "SamplingFrequency": raw.info["sfreq"],
-    "EEGChannelCount": len(eeg_channels),
-    "EOGChannelCount": len(eog_channels),
-    "ECGChannelCount": len(ecg_channels),
-    "EMGChannelCount": len(emg_channels),
-    "MiscChannelCount": len(misc_channels),
-    "TriggerChannelCount": 0,
-    "SoftwareFilters": "tbd",
-    "HardwareFilters": {
-        "tbd": {
-            "tbd": "tbd",
-            "tbd": "tbd"
-        }
-    },
-    "RecordingType": "continuous",
-    "RecordingDuration": raw.times[-1]
-}
-
+eeg_sidecar = utils.generate_eeg_bids_sidecar(
+    task_name="nap",
+    task_description="Participants went to sleep and TMR cues were played quietly during slow-wave sleep",
+    task_instructions="Go to sleep",
+    reference_channel=reference_channel,
+    ground_channel=ground_channel,
+    sampling_frequency=raw.info["sfreq"],
+    recording_duration=raw.times[-1],
+    n_eeg_channels=len(eeg_channels),
+    n_eog_channels=len(eog_channels),
+    n_ecg_channels=len(ecg_channels),
+    n_emg_channels=len(emg_channels),
+    n_misc_channels=len(misc_channels),
+)
 
 ######### Events
 
@@ -198,7 +187,14 @@ raw.annotations.description = np.array([ event_desc[int(x)]
 ### represented as "Events" rather than "Annotations"
 events_from_annot, event_dict = mne.events_from_annotations(raw, event_id=event_id)
 
+# # Remove existing annotations (to avoid redundancy).
+# while raw.annotations:
+#     raw.annotations.delete(0)
+
 events_df = pd.DataFrame(events_from_annot, columns=["onset", "duration", "value"])
+
+# mne returns onset in unit of sample number, change to seconds
+events_df["onset"] /= raw.info["sfreq"]
 
 def get_stim_name(x):
     for p in stimuli_relpaths:
@@ -208,47 +204,50 @@ def get_stim_name(x):
 events_df["description"] = events_df["value"].map(event_desc)
 events_df["stim_file"] = events_df["description"].apply(get_stim_name)
 
-events_sidecar_info = {
-    "onset": {
-        "LongName": "Onset (in seconds) of the event",
-        "Description": "Onset (in seconds) of the event"
-    },
-    "duration": {
-        "LongName": "Duration of the event (measured from onset) in seconds",
-        "Description": "Duration of the event (measured from onset) in seconds"
-    },
-    "value": {
-        "LongName": "Marker/trigger value associated with the event",
-        "Description": "Marker/trigger value associated with the event"
-    },
-    "description": {
-        "LongName": "Value description",
-        "Description": "Readable explanation of value markers column",
-    },
-    "trial_type": {
-        "LongName": "General event category",
-        "Description": "Very different event types are included, so this clarifies",
-        "Levels": {
-            "tmr": "A sound cue for targeted memory reactivation",
-            "staging": "A sleep stage",
-            "misc": "Things like lights-on lights-off or note"
-        }
-    },
-    "StimulusPresentation": {
-        "OperatingSystem": "Linux Ubuntu 18.04.5",
-        "SoftwareName": "Psychtoolbox",
-        "SoftwareRRID": "SCR_002881",
-        "SoftwareVersion": "3.0.14",
-        "Code": "doi:10.5281/zenodo.3361717"
-    }
-}
+events_sidecar = utils.generate_eeg_events_bids_sidecar()
+
+
+######################################## Break up task files
+
+raw_save_kwargs = dict(fmt="single", overwrite=True)
+
+events = events_df.set_index("description")
+
+# Extract nap. (on/off reversed for 906, change for new subs)
+if "LightsOff" in events.index and "LightsOn" in events.index:
+    nap_tmin = events.loc["LightsOn", "onset"]
+    nap_tmax = events.loc["LightsOff", "onset"]
+    ## Save nap data.
+    # nap_raw = raw.copy().crop(tmin=nap_tmin, tmax=nap_tmax, include_tmax=True)
+    nap_events = events_df.query(f"onset.between({nap_tmin}, {nap_tmax})")
+    raw.save(eeg_path, tmin=nap_tmin, tmax=nap_tmax, **raw_save_kwargs)
+    dmlab.io.export_dataframe(nap_events, events_path)
+    dmlab.io.export_dataframe(channels_df, channels_path)
+    dmlab.io.export_json(eeg_sidecar, eeg_path.with_suffix(".json"))
+    dmlab.io.export_json(events_sidecar, events_path.with_suffix(".json"))
+    dmlab.io.export_json(channels_sidecar, channels_path.with_suffix(".json"))
+
+biocals_tmin = events.loc["Biocals OpenEyes", "onset"]
+prenap_events = events.query(f"onset.lt({biocals_tmin})")
+postnap_events = events.query(f"onset.gt({nap_tmax})")
+path_adjuster = lambda p, t, a: p.as_posix().replace("task-nap", f"task-{t}_acq-{p}")
+
+if "bct-start" in prenap_events.index and "bct-end" in prenap_events.index:
+    # Extract bct pre.
+    bct_pre_tmin = events.loc["bct-start", "onset"]
+    bct_pre_tmax = events.loc["bct-end", "onset"]
+    raw.save(path_adjuster(eeg_path, "bct", "pre"),
+        tmin=bct_pre_tmin, tmax=bct_pre_tmax, **raw_save_kwargs)
+
+
+
+# Extract bct post.
+# Extract svp pre.
+# Extract svp post.
+
 
 
 ######################################## Export everything
 
-dmlab.io.export_json(channels_sidecar_info, channels_sidecar_path)
-dmlab.io.export_json(events_sidecar_info, events_sidecar_path)
-dmlab.io.export_json(eeg_sidecar_info, eeg_sidecar_path)
-dmlab.io.export_dataframe(channels_df, channels_path)
-dmlab.io.export_dataframe(events_df, events_path)
-raw.save(eeg_path, overwrite=True)
+# Nap
+
