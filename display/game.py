@@ -97,8 +97,8 @@ class Game(object):
     def send_to_pport(self, portcode):
         """Wrapper to avoid rewriting if not None a bunch"""
         if self.pport is not None:
-            self.pport.setData(portcode)
             self.pport.setData(0)
+            self.pport.setData(portcode)
 
     def init_slack(self):
         if os.path.exists(self.slack_url_path):
