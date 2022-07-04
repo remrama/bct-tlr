@@ -45,6 +45,10 @@ class SerialVisualPresentation(Game):
         self.target_button = target_button
         self.nontarget_button = nontarget_button
         self.trial_keylist = [target_button, nontarget_button]
+        self.response_legend = {
+            nontarget_button: "nontarget",
+            target_button: "target",
+        } # dumb
 
         self.instructions_messages = [
             "In this task, we would like you to pay attention to a stream of numbers.",
@@ -120,11 +124,10 @@ class SerialVisualPresentation(Game):
                 for response in event.getKeys(keyList=self.trial_keylist, timeStamped=self.taskClock):
                     self.digitStim.bold = True
                     key, rt = response
-                    accurate = (key == self.nontarget_button
-                            and current_digit in self.nontarget_digits
-                        ) or (key == self.target_button
-                            and current_digit == self.target_digit
-                        )
+                    response_type = self.response_legend[key]
+                    self.send_to_pport(self.pport_codes[f"svp-{response_type}"])
+                    accurate = (response_type == "nontarget" and current_digit in self.nontarget_digits
+                        ) or (response_type == "target" and current_digit == self.target_digit)
                     response += (accurate,)
                     if not self.passed_practice:
                         if accurate:

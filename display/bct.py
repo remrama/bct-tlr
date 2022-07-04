@@ -46,8 +46,8 @@ class BreathCountingTask(Game):
         # else:
         self.response_legend = {
             "left": "nontarget",
-            "right": "reset",
-            "space": "target",
+            "right": "target",
+            "space": "reset",
         }
         self.keylist = list(self.response_legend.keys())
 
@@ -210,7 +210,7 @@ class BreathCountingTask(Game):
             for response in event.getKeys(keyList=self.keylist, timeStamped=self.trialClock):
                 self.flutter_fixation()
                 key, rt = response
-                print(key)
+                # print(key)
                 response_type = self.response_legend[key]
                 # left_clicked, right_clicked, _ = presses
                 # left_rt, right_rt, _ = timestamps

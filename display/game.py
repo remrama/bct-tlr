@@ -99,6 +99,9 @@ class Game(object):
         if self.pport is not None:
             self.pport.setData(0)
             self.pport.setData(portcode)
+            logging.log(level=logging.INFO, msg=f"ParallelPort: {portcode} sent.")
+        else:
+            logging.log(level=logging.INFO, msg=f"ParallelPort: {portcode} failed.")
 
     def init_slack(self):
         if os.path.exists(self.slack_url_path):
