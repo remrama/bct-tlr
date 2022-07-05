@@ -33,7 +33,7 @@ import dmlab
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, default=906)
+parser.add_argument("--participant", type=int, default=907)
 parser.add_argument("--session", type=int, default=1)
 args = parser.parse_args()
 
@@ -81,7 +81,7 @@ participant_parent.mkdir(parents=True, exist_ok=True)
 
 # Load participants file.
 participants = utils.load_participants_file()
-measurement_date = participants.loc[participant_id, "timestamp"]
+measurement_date = participants.loc[participant_id, "measurement_date"]
 
 # Load raw Neuroscan EEG file
 raw = mne.io.read_raw_cnt(import_path,
@@ -187,28 +187,50 @@ events_df["onset"] /= raw.info["sfreq"]
 
 def get_stim_name(x):
     for p in stimuli_relpaths:
-        if x.split()[-1] in p:
+        if x.split("-")[-1] in p:
             return p
 
 events_df["stim_file"] = events_df["description"].apply(get_stim_name)
-events_df["description"] = events_df["description"].apply(lambda x: "Biocals" if x.startswith("Biocals") else x)
-events_df["description"] = events_df["description"].apply(lambda x: "Cue" if "Cue" in x else x)
+events_df["description"] = events_df["description"].apply(
+    lambda x: x.split("-")[0] if x.split("-")[0] in ["Biocal", "CueStarted"] else x)
 
 events_df["next_description"] = events_df["description"].shift(-1, fill_value="FILL")
 events_df["next_onset"] = events_df["onset"].shift(-1, fill_value="FILL")
+end_duration_descriptions = ["CueStopped", "DreamReportStopped"]
 def get_duration(row):
-    if row["next_description"] == "Stopped cue":
+    if row["next_description"] in end_duration_descriptions:
         return row["next_onset"] - row["onset"]
     else:
         return row["duration"]
 
 events_df["duration"] = events_df.apply(get_duration, axis=1)
 events_df = events_df.drop(columns=["next_description", "next_onset"])
-events_df = events_df.query("description.ne('Stopped cue')")
+events_df = events_df.query(f"~description.isin({end_duration_descriptions})")
+
+# Remove some descriptions/codes we don't care about for now.
+events_df = events_df[~events_df["description"].str.split("-").str[1].isin([
+    "target", "nontarget", "reset"])]
+
+
+# # Could get measurement date from participants file,
+# # but to get very specific timestamps and link to TMR log file,
+# # pick one of the TMR log timestamps arbitrarily and set it
+# # relative to that.
+# # raw.set_meas_date(measurement_date.to_pydatetime())
+# # set_meas_date
+# # If datetime object, it must be timezone-aware and in UTC.
+# # port_connection_str = tmr_log.query("msg.str.startswith('Parallel port connection succeeded')")["msg"].values[0]
+# # port_connection_code = int(port_connection_str.split()[-1])
+# events_df["onset_ts"] = pd.NaT
+# row_index = events_df["description"].str.startswith("Parallel port connection succeeded")
+# events_df.loc[row_index, "onset_ts"] = tmr_log.loc[tmr_log["msg"].str.endswith("200"), "timestamp"].values[0]
+
+# # Remove more don't care about.
+# events_df = events_df.query("description.ne('Parallel port connection succeeded.')")
+
 
 new_unique_values = { d: i+1 for i, d in enumerate(events_df["description"].unique()) }
 events_df["value"] = events_df["description"].map(new_unique_values)
-
 
 # Remove existing annotations (to avoid redundancy).
 while raw.annotations:
@@ -221,13 +243,6 @@ while raw.annotations:
 events_sidecar = utils.generate_eeg_events_bids_sidecar()
 
 
-# Could get measurement date from participants file,
-# but to get very specific timestamps and link to TMR log file,
-# pick one of the TMR log timestamps arbitrarily and set it
-# relative to that.
-# raw.set_meas_date(measurement_date.to_pydatetime())
-# set_meas_date
-# If datetime object, it must be timezone-aware and in UTC.
 
 
 
@@ -239,8 +254,8 @@ events = events_df.set_index("description")
 
 # Extract nap. (on/off reversed for 906, change for new subs)
 if "LightsOff" in events.index and "LightsOn" in events.index:
-    nap_tmin = events.loc["LightsOn", "onset"]
-    nap_tmax = events.loc["LightsOff", "onset"]
+    nap_tmin = events.loc["LightsOff", "onset"]
+    nap_tmax = events.loc["LightsOn", "onset"]
     ## Save nap data.
     # nap_raw = raw.copy().crop(tmin=nap_tmin, tmax=nap_tmax, include_tmax=True)
     nap_events = events_df.query(f"onset.between({nap_tmin}, {nap_tmax})")
@@ -250,18 +265,20 @@ if "LightsOff" in events.index and "LightsOn" in events.index:
     dmlab.io.export_json(eeg_sidecar, eeg_path.with_suffix(".json"))
     dmlab.io.export_json(events_sidecar, events_path.with_suffix(".json"))
     dmlab.io.export_json(channels_sidecar, channels_path.with_suffix(".json"))
+else:
+    raise ValueError("Missing LightsOff and/or LightsOn")
 
 # biocals_tmin = events.loc["Biocals OpenEyes", "onset"]
 prenap_events = events.query(f"onset.lt({nap_tmin})")
 postnap_events = events.query(f"onset.gt({nap_tmax})")
 path_adjuster = lambda p, t, a: p.as_posix().replace("task-nap", f"task-{t}_acq-{p}")
 
-if "bct-start" in prenap_events.index and "bct-end" in prenap_events.index:
-    # Extract bct pre.
-    bct_pre_tmin = events.loc["bct-start", "onset"]
-    bct_pre_tmax = events.loc["bct-end", "onset"]
-    raw.save(path_adjuster(eeg_path, "bct", "pre"),
-        tmin=bct_pre_tmin, tmax=bct_pre_tmax, **raw_save_kwargs)
+# if "bct-start" in prenap_events.index and "bct-stop" in prenap_events.index:
+#     # Extract bct pre.
+#     bct_pre_tmin = events.loc["bct-start", "onset"]
+#     bct_pre_tmax = events.loc["bct-end", "onset"]
+#     raw.save(path_adjuster(eeg_path, "bct", "pre"),
+#         tmin=bct_pre_tmin, tmax=bct_pre_tmax, **raw_save_kwargs)
 
 
 

@@ -22,10 +22,10 @@ config.read("./config.ini")
 def load_participants_file():
     bids_root = config.get("Paths", "bids_root")
     filepath = Path(bids_root) / "participants.tsv"
-    df = pd.read_csv(filepath, index_col="participant_id", parse_dates=["timestamp"], sep="\t")
+    df = pd.read_csv(filepath, index_col="participant_id", parse_dates=["measurement_date"], sep="\t")
     # MNE wants UTC and check fails if UTC is a string rather than datetime timezone.
     # https://github.com/mne-tools/mne-python/blob/3c23f13c0262118d075de0719248409bdc838982/mne/utils/numerics.py#L1036
-    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+    df["measurement_date"] = df["measurement_date"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
     return df
 
 
@@ -173,19 +173,17 @@ def get_tmr_codes(participant, session):
 
     codes = {}
     for timestamp, msg in ser.items():
-        if "cue" in msg:
+        if msg.startswith("Cue"):
             description, _, portcode_str = msg.split(" - ")
         else:
             description, portcode_str = msg.split(" - ")
         portcode = int(portcode_str.split()[-1])
 
-        # Ignore portcodes for stopping cues and dream reports.
-        if description.startswith("Stopped cue"):
-            description = "Stopped cue"
-        elif description == "StoppedDreamReport":
-            continue # skip for now
-        elif description.startswith("Played cue"):
-            description = description.split()[-1]
+        # Portcodes for cue stopping will be same code but different descriptions.
+        if description.startswith("CueStopped"):
+            description = "CueStopped"
+        # elif description.startswith("Played cue"):
+        #     description = description.split()[-1]
 
         if portcode in codes:
             assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
