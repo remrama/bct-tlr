@@ -185,7 +185,7 @@ class Game(object):
     def show_message_and_wait_for_press(self, text):
         self.middleText.text = inspect.cleandoc(text)
         self.middleText.draw()
-        self.nextButton.setOpacity(.1)
+        self.nextButton.setOpacity(.01)
         self.nextButton.draw()
         self.win.flip()
         core.wait(3)
