@@ -1,7 +1,6 @@
 """Convert a single qualtrics survey to tsv and companion json."""
 
 import argparse
-from pathlib import Path
 
 import numpy as np
 import pyreadstat
@@ -11,7 +10,6 @@ import utils
 
 parser = argparse.ArgumentParser()
 parser.add_argument(
-    "-s",
     "--survey",
     type=str,
     required=True,

@@ -15,14 +15,14 @@ python source2raw-qualtrics.py --survey Debriefing+Survey   #> phenotype/debrief
 python source2raw-qualtrics.py --survey Dream+Report        #> phenotype/dream_report.tsv
 
 # Convert participant behavior json/log files to tsv
-python source2raw-bct.py            
+python source2raw-bct.py
 #=> <sub>/beh/<sub>_task-bct_acq-pre_beh.tsv / .json
 #=> <sub>/beh/<sub>_task-bct_acq-post_beh.tsv / .json
 
 # Dream report Qualtrics file is used for events file or a separate awakenings file.
 
 # Convert each participant's EEG file to multiple task files.
-python source2raw-survey.py
+python source2raw-eeg.py
 #=> <sub>/<sub>_scans.tsv / json
 #=> <sub>/eeg/<sub>_task-sleep_<run>_eeg.fif / .json
 #=> <sub>/eeg/<sub>_task-sleep_<run>_events.tsv / .json

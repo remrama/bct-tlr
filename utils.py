@@ -4,6 +4,7 @@ from datetime import timezone
 import json
 from pathlib import Path
 
+import numpy as np
 import pandas as pd
 
 
@@ -19,22 +20,27 @@ DERIVATIVES_DIR = ROOT_DIR / "derivatives"
 STIMULI_DIR = ROOT_DIR / "stimuli"
 
 # PSG
-# source_extension: .cnt
-# raw_extension: .fif
-# eeg: ["Fz", "Cz", "Oz"]
-# eog: ["L-VEOG", "R-HEOG"]
-# ecg: ["HR"]
-# emg: ["EMG"]
-# misc: ["L-MSTD", "Airflow", "Snoring", "RESP"]
-# reference: R-MSTD
-# ground: Fpz
-# notch_frequency: 60
+EEG_SOURCE_EXTENSION = ".cnt"
+EEG_RAW_EXTENSION = ".fif"
+EEG_CHANNELS = ["Fz", "Cz", "Oz"]
+EOG_CHANNELS = ["L-VEOG", "R-HEOG"]
+ECG_CHANNELS = ["HR"]
+EMG_CHANNELS = ["EMG"]
+MISC_CHANNELS = ["L-MSTD", "Airflow", "Snoring", "RESP"]
+# REFERENCE_CHANNEL = "R-MSTD"
+# GROUND_CHANNEL = "Fpz"
+NOTCH_FREQUENCY = 60
 
 
 ################################################################################
 # MISCELLANEOUS
 ################################################################################
 
+
+def import_json(filepath: str, **kwargs) -> dict:
+    """Loads json file as a dictionary"""
+    with open(filepath, "rt", encoding="utf-8") as fp:
+        return json.load(fp, **kwargs)
 
 def export_json(obj: dict, filepath: str, mode: str="wt", **kwargs):
     kwargs = {"indent": 4} | kwargs
@@ -57,84 +63,112 @@ def load_participants_file():
 
 
 ################################################################################
-# PORTCODE FUNCTIONS
+# SMACC LOG PROCESSING
+################################################################################
+
+def read_smacc_log(filepath):
+    df = pd.read_csv(filepath, names=["timestamp", "msg_level", "msg"], parse_dates=["timestamp"])
+    # Localize timestamp.
+    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+    # Remove excess whitespace.
+    df["msg"] = df["msg"].str.strip()
+    # Drop msg_level column (useless because always "INFO")
+    df = df.drop(columns="msg_level")
+    # Drop some rows that are useless.
+    df = df[df.msg.ne("Opened TWC interface v0.0")]
+    df = df[df.msg.ne("Program closed")]
+    df = df[~df.msg.str.contains("VolumeSet")]
+    # Reduce to only events with portcodes
+    assert not df.msg.str.contains("Failed portcode").any()
+    df = df.loc[df.msg.str.contains("Sent portcode")]
+    # Expand single "msg" column to "description" and "value"
+    df["value"] = df.msg.str.split(" - ").str[-1].str.split().str[-1].astype(int)
+    df["description"] = df.msg.str.split(" - ").str[0].str.split("-").str[0]
+    df["stim_file"] = df.msg.str.split(" - ").str[0].str.split("-").str[1].add(".wav")
+    # df["trial_type"] = pd.NA
+    # df.loc[df.stim_file.str.startswith("lux3").fillna(False), "trial_type"] = "BCT"
+    # df.loc[df.stim_file.str.startswith("med1").fillna(False), "trial_type"] = "MW" if participant < 900 else "SVP"
+    df["trial_type"] = df.msg.str.split("CueStarted-").str[1].str.split("_").str[0].replace({"lux3": "bct", "med1": "mwt"})
+    # Get duration of each cue (this ASSUMES there is a start for every stop)
+    assert df.msg.str.contains("CueStarted").sum() == df.msg.str.contains("CueStarted").sum(), "Make sure each cue has both start and stop messages."
+    assert df.msg.str.contains("DreamReportStarted").sum() == df.msg.str.contains("DreamReportStopped").sum(), "Make sure each dream report has both start and stop messages."
+    df["duration"] = df["timestamp"].diff().dt.total_seconds().shift(-1)
+    df.loc[~df.description.isin(["CueStarted", "DreamReportStarted"]), "duration"] = np.nan
+    # Now able to drop the Stopped codes.
+    df = df.loc[~df.msg.str.contains("Stopped")]
+    df["description"] = df.description.str.rsplit("Started").str[0]
+    # Add *initial* volume for cues.
+    df["volume"] = df.msg.str.split("Volume ").str[1].str.split(" - ").str[0]
+    df["description"] = df["description"].replace({"Parallel port connection succeeded.": "CONNECTION"})
+    df = df.drop(columns="msg")
+    # Remove cues from before lights were out??
+
+    # Check some expectations.
+    assert df.description.value_counts().at["CONNECTION"] == 1
+
+    return df.reset_index(drop=True).sort_values("timestamp")
+
+
+
+################################################################################
+# PORTCODE EXTRACTION
 ################################################################################
 
 
-def load_tmr_logfile(participant, session):
+# def get_smacc_codes(filepath):
+#     """Get {code: description} event codes from SMACC log file."""
+#     return read_smacc_log(filepath).set_index("value").description.to_dict()
 
-    source_dir = config.get("Paths", "source")
-    tmr_log_path = Path(source_dir).joinpath(
-        f"sub-{participant:03d}",
-        f"sub-{participant:03d}_ses-{session:03d}_tmr.log",
-    )
+    # df = read_smacc_log(filepath)
+    # # Combine columns to get back unique portcode identifiers.
+    # df["code_description"] = df[["description", "stim_file"]].fillna("").agg("-".join, axis=1).str.rstrip("-")
+    # assert df.groupby("value").code_description.nunique().eq(1).all(), "All portcode values must have unique descriptions."
+    # ser = df.set_index("value").description.to_dict()
+    # return ser
 
-    df = pd.read_csv(tmr_log_path,
-        names=["timestamp", "msg_level", "msg"],
-        parse_dates=["timestamp"])
-    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
-    df["msg"] = df["msg"].str.strip()
-    return df
+    # event_id = 
+    # df = read_smacc_log(filepath)
+    # ser = df.set_index("timestamp")["msg"]
+    # codes = {}
+    # for timestamp, msg in ser.items():
+    #     if msg.startswith("Cue"):
+    #         description, _, portcode_str = msg.split(" - ")
+    #     else:
+    #         description, portcode_str = msg.split(" - ")
+    #     portcode = int(portcode_str.split()[-1])
+    #     # Portcodes for cue stopping will be same code but different descriptions.
+    #     if description.startswith("CueStopped"):
+    #         description = "CueStopped"
+    #     # elif description.startswith("Played cue"):
+    #     #     description = description.split()[-1]
+    #     if portcode in codes:
+    #         assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
+    #     else:
+    #         codes[portcode] = description
+    # codes = { k: codes[k] for k in sorted(codes) }
+    # return codes
 
-def get_tmr_codes(participant, session):
-    #### Get event codes from TWC GUI log.
+# def get_beh_codes(participant, session):
+#     # All behavior json code files are the same.
+#     # They save out codes for all the tasks so just grab BCT pre arbitrarily.
+#     source_dir = config.get("Paths", "source")
+#     beh_code_path = Path(source_dir).joinpath(
+#         f"sub-{participant:03d}",
+#         f"sub-{participant:03d}_ses-{session:03d}_task-bct_acq-pre_portcodes.json",
+#     )
+#     codes = dmlab.io.load_json(beh_code_path)
+#     # Flip so portcode is the key and description the value.
+#     # And sort.
+#     codes = { v: k for k, v in codes.items() }
+#     codes = { k: codes[k] for k in sorted(codes) }
+#     return codes
 
-    df = load_tmr_logfile(participant, session)
-    ser = df.set_index("timestamp")["msg"]
-
-    # Reduce to only events with portcodes
-    assert not ser.str.contains("Failed portcode").any()
-    ser = ser[ser.str.contains("Sent portcode")]
-
-    codes = {}
-    for timestamp, msg in ser.items():
-        if msg.startswith("Cue"):
-            description, _, portcode_str = msg.split(" - ")
-        else:
-            description, portcode_str = msg.split(" - ")
-        portcode = int(portcode_str.split()[-1])
-
-        # Portcodes for cue stopping will be same code but different descriptions.
-        if description.startswith("CueStopped"):
-            description = "CueStopped"
-        # elif description.startswith("Played cue"):
-        #     description = description.split()[-1]
-
-        if portcode in codes:
-            assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
-        else:
-            codes[portcode] = description
-
-    codes = { k: codes[k] for k in sorted(codes) }
-
-    ## Getting duration of cues.
-    ## Need to figure out how to match with timed EEG file.
-    # df = ser[ser.str.contains("cue")].to_frame()
-    # df["s"] = df.index
-    # df.s.diff().dt.total_seconds().shift(-1)[::2]
-    return codes
-
-def get_beh_codes(participant, session):
-    # All behavior json code files are the same.
-    # They save out codes for all the tasks so just grab BCT pre arbitrarily.
-    source_dir = config.get("Paths", "source")
-    beh_code_path = Path(source_dir).joinpath(
-        f"sub-{participant:03d}",
-        f"sub-{participant:03d}_ses-{session:03d}_task-bct_acq-pre_portcodes.json",
-    )
-    codes = dmlab.io.load_json(beh_code_path)
-    # Flip so portcode is the key and description the value.
-    # And sort.
-    codes = { v: k for k, v in codes.items() }
-    codes = { k: codes[k] for k in sorted(codes) }
-    return codes
-
-def get_all_portcodes(participant, session):
-    tmr_codes = get_tmr_codes(participant, session)
-    beh_codes = get_beh_codes(participant, session)
-    all_codes = beh_codes | tmr_codes
-    assert len(all_codes) == len(tmr_codes) + len(beh_codes)
-    return { k: all_codes[k] for k in sorted(all_codes) }
+# def get_all_portcodes(participant, session):
+#     tmr_codes = get_tmr_codes(participant, session)
+#     beh_codes = get_beh_codes(participant, session)
+#     all_codes = beh_codes | tmr_codes
+#     assert len(all_codes) == len(tmr_codes) + len(beh_codes)
+#     return { k: all_codes[k] for k in sorted(all_codes) }
 
 
 ################################################################################
@@ -142,7 +176,7 @@ def get_all_portcodes(participant, session):
 ################################################################################
 
 
-def generate_eeg_bids_sidecar(
+def generate_eeg_sidecar(
         task_name,
         task_description,
         task_instructions,
@@ -155,9 +189,9 @@ def generate_eeg_bids_sidecar(
         n_ecg_channels,
         n_emg_channels,
         n_misc_channels,
-        **kwargs
+        **kwargs,
     ):
-    defaults = {
+    return {
         "TaskName": task_name,
         "TaskDescription": task_description,
         "Instructions": task_instructions,
@@ -186,12 +220,10 @@ def generate_eeg_bids_sidecar(
         },
         "RecordingType": "continuous",
         "RecordingDuration": recording_duration,
-    }
-    defaults.update(kwargs)
-    return defaults
+    } | kwargs
 
-def generate_eeg_channels_bids_sidecar(**kwargs):
-    defaults = {
+def generate_channels_sidecar(**kwargs):
+    return {
         "name": "See BIDS spec",
         "type": "See BIDS spec",
         "units": "See BIDS spec",
@@ -204,12 +236,10 @@ def generate_eeg_channels_bids_sidecar(**kwargs):
         "status": "See BIDS spec",
         "status_description": "See BIDS spec",
         "RespirationHardware": "tbd", # seems like a good thing to add??
-    }
-    defaults.update(kwargs)
-    return defaults
+    } | kwargs
 
-def generate_eeg_events_bids_sidecar(**kwargs):
-    info = {
+def generate_events_sidecar(columns, **kwargs):
+    column_info = {
         "onset": {
             "LongName": "Onset (in seconds) of the event",
             "Description": "Onset (in seconds) of the event"
@@ -226,23 +256,29 @@ def generate_eeg_events_bids_sidecar(**kwargs):
             "LongName": "Value description",
             "Description": "Readable explanation of value markers column",
         },
+        "stim_file": {
+            "LongName": "words",
+            "Description": "more words",
+        },
+        "volume": {
+            "LongName": "words",
+            "Description": "more words",
+        },
         "trial_type": {
             "LongName": "General event category",
             "Description": "Very different event types are included, so this clarifies",
             "Levels": {
                 "tmr": "A sound cue for targeted memory reactivation",
-                "staging": "A sleep stage",
                 "misc": "Things like lights-on lights-off or note"
             }
-        },
-        "StimulusPresentation": {
-            "OperatingSystem": "Linux Ubuntu 18.04.5",
-            "SoftwareName": "Psychtoolbox",
-            "SoftwareRRID": "SCR_002881",
-            "SoftwareVersion": "3.0.14",
-            "Code": "doi:10.5281/zenodo.3361717"
         }
-    } | kwargs
-    # Make sure stim presentation info is last (only one that's not a column).
-    info["StimulusPresentation"] = info.pop("StimulusPresentation")
-    return info
+    }
+    info = { c: column_info[c] for c in columns }
+    # info["StimulusPresentation"] = {
+    #     "OperatingSystem": "Linux Ubuntu 18.04.5",
+    #     "SoftwareName": "Psychtoolbox",
+    #     "SoftwareRRID": "SCR_002881",
+    #     "SoftwareVersion": "3.0.14",
+    #     "Code": "doi:10.5281/zenodo.3361717"
+    # }
+    return info | kwargs
