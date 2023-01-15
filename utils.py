@@ -1,27 +1,54 @@
-"""Helper functions"""
+"""Global parameters and helper functions."""
 
-# Add development dir while working on dmlab.
-import sys
-sys.path.append("C:/Users/malle/packages/dmlab")
-
-import configparser
 from datetime import timezone
 import json
 from pathlib import Path
 
 import pandas as pd
 
-import dmlab
+
+################################################################################
+# GLOBAL PARAMETERS
+################################################################################
 
 
-# Load configuration file so it's accessible from utils
-config = configparser.ConfigParser(converters={"list": json.loads})
-config.read("./config.ini")
+# Directories
+ROOT_DIR = Path("~/PROJECTS/bct-tmr").expanduser()
+SOURCE_DIR = ROOT_DIR / "sourcedata"
+DERIVATIVES_DIR = ROOT_DIR / "derivatives"
+STIMULI_DIR = ROOT_DIR / "stimuli"
 
+# PSG
+# source_extension: .cnt
+# raw_extension: .fif
+# eeg: ["Fz", "Cz", "Oz"]
+# eog: ["L-VEOG", "R-HEOG"]
+# ecg: ["HR"]
+# emg: ["EMG"]
+# misc: ["L-MSTD", "Airflow", "Snoring", "RESP"]
+# reference: R-MSTD
+# ground: Fpz
+# notch_frequency: 60
+
+
+################################################################################
+# MISCELLANEOUS
+################################################################################
+
+
+def export_json(obj: dict, filepath: str, mode: str="wt", **kwargs):
+    kwargs = {"indent": 4} | kwargs
+    with open(filepath, mode, encoding="utf-8") as fp:
+        json.dump(obj, fp, **kwargs)
+
+def export_tsv(df, filepath, mkdir=True, **kwargs):
+    kwargs = {"sep": "\t", "na_rep": "n/a"} | kwargs
+    if mkdir:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+    df.to_csv(filepath, **kwargs)
 
 def load_participants_file():
-    bids_root = config.get("Paths", "bids_root")
-    filepath = Path(bids_root) / "participants.tsv"
+    filepath = ROOT_DIR / "participants.tsv"
     df = pd.read_csv(filepath, index_col="participant_id", parse_dates=["measurement_date"], sep="\t")
     # MNE wants UTC and check fails if UTC is a string rather than datetime timezone.
     # https://github.com/mne-tools/mne-python/blob/3c23f13c0262118d075de0719248409bdc838982/mne/utils/numerics.py#L1036
@@ -29,9 +56,91 @@ def load_participants_file():
     return df
 
 
-####################################################
-# Functions to generate BIDS sidecars
-####################################################
+################################################################################
+# PORTCODE FUNCTIONS
+################################################################################
+
+
+def load_tmr_logfile(participant, session):
+
+    source_dir = config.get("Paths", "source")
+    tmr_log_path = Path(source_dir).joinpath(
+        f"sub-{participant:03d}",
+        f"sub-{participant:03d}_ses-{session:03d}_tmr.log",
+    )
+
+    df = pd.read_csv(tmr_log_path,
+        names=["timestamp", "msg_level", "msg"],
+        parse_dates=["timestamp"])
+    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+    df["msg"] = df["msg"].str.strip()
+    return df
+
+def get_tmr_codes(participant, session):
+    #### Get event codes from TWC GUI log.
+
+    df = load_tmr_logfile(participant, session)
+    ser = df.set_index("timestamp")["msg"]
+
+    # Reduce to only events with portcodes
+    assert not ser.str.contains("Failed portcode").any()
+    ser = ser[ser.str.contains("Sent portcode")]
+
+    codes = {}
+    for timestamp, msg in ser.items():
+        if msg.startswith("Cue"):
+            description, _, portcode_str = msg.split(" - ")
+        else:
+            description, portcode_str = msg.split(" - ")
+        portcode = int(portcode_str.split()[-1])
+
+        # Portcodes for cue stopping will be same code but different descriptions.
+        if description.startswith("CueStopped"):
+            description = "CueStopped"
+        # elif description.startswith("Played cue"):
+        #     description = description.split()[-1]
+
+        if portcode in codes:
+            assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
+        else:
+            codes[portcode] = description
+
+    codes = { k: codes[k] for k in sorted(codes) }
+
+    ## Getting duration of cues.
+    ## Need to figure out how to match with timed EEG file.
+    # df = ser[ser.str.contains("cue")].to_frame()
+    # df["s"] = df.index
+    # df.s.diff().dt.total_seconds().shift(-1)[::2]
+    return codes
+
+def get_beh_codes(participant, session):
+    # All behavior json code files are the same.
+    # They save out codes for all the tasks so just grab BCT pre arbitrarily.
+    source_dir = config.get("Paths", "source")
+    beh_code_path = Path(source_dir).joinpath(
+        f"sub-{participant:03d}",
+        f"sub-{participant:03d}_ses-{session:03d}_task-bct_acq-pre_portcodes.json",
+    )
+    codes = dmlab.io.load_json(beh_code_path)
+    # Flip so portcode is the key and description the value.
+    # And sort.
+    codes = { v: k for k, v in codes.items() }
+    codes = { k: codes[k] for k in sorted(codes) }
+    return codes
+
+def get_all_portcodes(participant, session):
+    tmr_codes = get_tmr_codes(participant, session)
+    beh_codes = get_beh_codes(participant, session)
+    all_codes = beh_codes | tmr_codes
+    assert len(all_codes) == len(tmr_codes) + len(beh_codes)
+    return { k: all_codes[k] for k in sorted(all_codes) }
+
+
+################################################################################
+# GENERATING BIDS SIDECAR FILES
+################################################################################
+
 
 def generate_eeg_bids_sidecar(
         task_name,
@@ -100,7 +209,7 @@ def generate_eeg_channels_bids_sidecar(**kwargs):
     return defaults
 
 def generate_eeg_events_bids_sidecar(**kwargs):
-    defaults = {
+    info = {
         "onset": {
             "LongName": "Onset (in seconds) of the event",
             "Description": "Onset (in seconds) of the event"
@@ -133,92 +242,7 @@ def generate_eeg_events_bids_sidecar(**kwargs):
             "SoftwareVersion": "3.0.14",
             "Code": "doi:10.5281/zenodo.3361717"
         }
-    }
-    defaults.update(kwargs)
+    } | kwargs
     # Make sure stim presentation info is last (only one that's not a column).
-    defaults["StimulusPresentation"] = defaults.pop("StimulusPresentation")
-    return defaults
-
-
-
-####################################################
-# Portcode functions
-####################################################
-
-def load_tmr_logfile(participant, session):
-
-    source_dir = config.get("Paths", "source")
-    tmr_log_path = Path(source_dir).joinpath(
-        f"sub-{participant:03d}",
-        f"sub-{participant:03d}_ses-{session:03d}_tmr.log",
-    )
-
-    df = pd.read_csv(tmr_log_path,
-        names=["timestamp", "msg_level", "msg"],
-        parse_dates=["timestamp"])
-    df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
-    df["msg"] = df["msg"].str.strip()
-    return df
-
-
-def get_tmr_codes(participant, session):
-    #### Get event codes from TWC GUI log.
-
-    df = load_tmr_logfile(participant, session)
-    ser = df.set_index("timestamp")["msg"]
-
-    # Reduce to only events with portcodes
-    assert not ser.str.contains("Failed portcode").any()
-    ser = ser[ser.str.contains("Sent portcode")]
-
-    codes = {}
-    for timestamp, msg in ser.items():
-        if msg.startswith("Cue"):
-            description, _, portcode_str = msg.split(" - ")
-        else:
-            description, portcode_str = msg.split(" - ")
-        portcode = int(portcode_str.split()[-1])
-
-        # Portcodes for cue stopping will be same code but different descriptions.
-        if description.startswith("CueStopped"):
-            description = "CueStopped"
-        # elif description.startswith("Played cue"):
-        #     description = description.split()[-1]
-
-        if portcode in codes:
-            assert codes[portcode] == description, f"{portcode} has varying descriptions, here it was {description}"
-        else:
-            codes[portcode] = description
-
-    codes = { k: codes[k] for k in sorted(codes) }
-
-    ## Getting duration of cues.
-    ## Need to figure out how to match with timed EEG file.
-    # df = ser[ser.str.contains("cue")].to_frame()
-    # df["s"] = df.index
-    # df.s.diff().dt.total_seconds().shift(-1)[::2]
-    return codes
-
-
-def get_beh_codes(participant, session):
-    # All behavior json code files are the same.
-    # They save out codes for all the tasks so just grab BCT pre arbitrarily.
-    source_dir = config.get("Paths", "source")
-    beh_code_path = Path(source_dir).joinpath(
-        f"sub-{participant:03d}",
-        f"sub-{participant:03d}_ses-{session:03d}_task-bct_acq-pre_portcodes.json",
-    )
-    codes = dmlab.io.load_json(beh_code_path)
-    # Flip so portcode is the key and description the value.
-    # And sort.
-    codes = { v: k for k, v in codes.items() }
-    codes = { k: codes[k] for k in sorted(codes) }
-    return codes
-
-def get_all_portcodes(participant, session):
-    tmr_codes = get_tmr_codes(participant, session)
-    beh_codes = get_beh_codes(participant, session)
-    all_codes = beh_codes | tmr_codes
-    assert len(all_codes) == len(tmr_codes) + len(beh_codes)
-    return { k: all_codes[k] for k in sorted(all_codes) }
-
+    info["StimulusPresentation"] = info.pop("StimulusPresentation")
+    return info
