@@ -8,7 +8,7 @@ import pandas as pd
 
 import utils
 
-import dmlab
+# import dmlab
 
 
 bids_root = utils.config.get("Paths", "bids_root")
@@ -37,6 +37,7 @@ for bf in bids_files:
     dataframes.append(_df)
 
 df = pd.concat(dataframes)
+df.to_csv("./task-bct_agg.csv", index=False)
 
-# Draw and save plot using DML package.
-fig = dmlab.bct.plot_presses(df, export_filepath, participant="participant_id")
+# # Draw and save plot using DML package.
+# fig = dmlab.bct.plot_presses(df, export_filepath, participant="participant_id")

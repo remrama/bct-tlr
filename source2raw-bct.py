@@ -1,6 +1,7 @@
 """Clean the BCT task data.
 Go from raw psychopy log file output to usable dataframe in BIDS format.
 """
+import json
 
 from pathlib import Path
 
@@ -9,21 +10,19 @@ import pandas as pd
 
 import utils
 
-import dmlab
 
-source_dir = utils.config.get("Paths", "source")
-raw_dir = utils.config.get("Paths", "raw")
 
+ROOT_DIR = utils.ROOT_DIR
+SOURCE_DIR = utils.SOURCE_DIR
 
 # file_list = utils.find_source_files("bct", "json")
-file_list = Path(source_dir).glob("sub-906/sub-*_psychopy.log")
+filepaths = SOURCE_DIR.glob("sub-*/sub-*_task-bct_acq-*_psychopy.log")
 
 # global_metadata = utils.load_config(as_object=False)["global_bids_metadata"]
 global_metadata = {
     "InstitutionName": "Northwestern University",
     "InstitutionDepartmentName": "Department of Psychology"
 }
-
 
 task_metadata = {
     "TaskName": "Breath Counting Task",
@@ -94,8 +93,6 @@ column_metadata = {
 
 }
 
-
-
 # column_names = list(column_metadata.keys())
 # column_names.remove("press_accuracy")
 
@@ -126,10 +123,14 @@ def press_accuracy(row):
 
 
 
-for filepath in file_list:
+for fp in filepaths:
+
+    sub_number = int(fp.parts[-2].split("-")[1])
+    if 901 <= sub_number <= 906:
+        continue
 
     # Load data.
-    df = pd.read_csv(filepath, sep="\t", names=["timestamp", "level", "info"])
+    df = pd.read_csv(fp, sep="\t", names=["timestamp", "level", "info"])
     df["level"] = df["level"].str.strip() # psychopy has a space after these for some reason
 
     # Restrict to after the task started and before it ended.
@@ -145,6 +146,11 @@ for filepath in file_list:
 
     # Sometimes there are different amounts of spaces between words in info.
     # Get rid of excess text to avoid this.
+    ## I pressed mouse once for 909 :/// during task :////
+    if sub_number == 909:
+        df = df[df["info"].str.startswith("Keypress:")]
+        # and they pushed down but it's like 8 ms after a press so doesn't count (and didn't move press count forward)
+        df = df[df["info"].ne("Keypress: down")]
     assert df["info"].str.startswith("Keypress:").all()
     df["info"] = df["info"].str.split("Keypress: ").str[1].str.strip()
 
@@ -179,26 +185,33 @@ for filepath in file_list:
 
     df = df.rename(columns={"info": "response"})
     # df["response"] = df["response"].str.lower()
-    df["response"] = df["response"].replace({nontarget_response: "nontarget", target_response: "target"})
+    df["response"] = df["response"].replace(
+        {
+            nontarget_response: "nontarget",
+            target_response: "target",
+            reset_response: "reset",
+        }
+    )
 
     df["timestamp"] = df["timestamp"].sub(starttime)
     df["accuracy"] = df.apply(press_accuracy, axis=1)
     
     df = df[["cycle", "press", "response", "timestamp", "accuracy"]]
 
-    entities = parse_file_entities(filepath)
+    entities = parse_file_entities(fp)
     subject_id = "sub-" + entities["subject"]
     task_id = "task-" + entities["task"]
     acquisition_id = "acq-" + entities["acquisition"]
     suffix_id = "beh"
 
     stem = "_".join([subject_id, task_id, acquisition_id, suffix_id])
-    export_path_data = Path(raw_dir) / subject_id / suffix_id / f"{stem}.tsv"
+    export_path_data = ROOT_DIR / subject_id / suffix_id / f"{stem}.tsv"
     export_path_sidecar = export_path_data.with_suffix(".json")
     export_path_data.parent.mkdir(parents=True, exist_ok=True)
 
-    df = df.to_csv(export_path_data, sep="\t", index=False, float_format="%.2f")
-    dmlab.io.export_json(sidecar, export_path_sidecar)
+    # df = df.to_csv(export_path_data, sep="\t", index=False, float_format="%.2f")
+    utils.export_tsv(df, export_path_data, index=False)
+    utils.export_json(sidecar, export_path_sidecar)
 
     # with open(file, "r", encoding="utf-8") as f:
     #     subject_data = json.load(f)

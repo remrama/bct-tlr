@@ -4,6 +4,7 @@ from datetime import timezone
 import json
 from pathlib import Path
 
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
@@ -31,6 +32,8 @@ MISC_CHANNELS = ["L-MSTD", "Airflow", "Snoring", "RESP"]
 # GROUND_CHANNEL = "Fpz"
 NOTCH_FREQUENCY = 60
 
+MNE_VERBOSITY = False
+
 
 ################################################################################
 # MISCELLANEOUS
@@ -50,8 +53,17 @@ def export_json(obj: dict, filepath: str, mode: str="wt", **kwargs):
 def export_tsv(df, filepath, mkdir=True, **kwargs):
     kwargs = {"sep": "\t", "na_rep": "n/a"} | kwargs
     if mkdir:
-        filepath.parent.mkdir(parents=True, exist_ok=True)
+        Path(filepath).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(filepath, **kwargs)
+
+def export_mpl(filepath, mkdir=True, close=True):
+    filepath = Path(filepath)
+    if mkdir:
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+    plt.savefig(filepath)
+    plt.savefig(filepath.with_suffix(".pdf"))
+    if close:
+        plt.close()
 
 def load_participants_file():
     filepath = ROOT_DIR / "participants.tsv"
@@ -67,6 +79,7 @@ def load_participants_file():
 ################################################################################
 
 def read_smacc_log(filepath):
+    # early_subject = "sub-90" in filepath.name
     df = pd.read_csv(filepath, names=["timestamp", "msg_level", "msg"], parse_dates=["timestamp"])
     # Localize timestamp.
     df["timestamp"] = df["timestamp"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
@@ -85,10 +98,10 @@ def read_smacc_log(filepath):
     df["value"] = df.msg.str.split(" - ").str[-1].str.split().str[-1].astype(int)
     df["description"] = df.msg.str.split(" - ").str[0].str.split("-").str[0]
     df["stim_file"] = df.msg.str.split(" - ").str[0].str.split("-").str[1].add(".wav")
-    # df["trial_type"] = pd.NA
-    # df.loc[df.stim_file.str.startswith("lux3").fillna(False), "trial_type"] = "BCT"
-    # df.loc[df.stim_file.str.startswith("med1").fillna(False), "trial_type"] = "MW" if participant < 900 else "SVP"
-    df["trial_type"] = df.msg.str.split("CueStarted-").str[1].str.split("_").str[0].replace({"lux3": "bct", "med1": "mwt"})
+    df["trial_type"] = np.nan
+    df.loc[df.stim_file.str.startswith("lux3").fillna(False), "trial_type"] = "bct"
+    df.loc[df.stim_file.str.startswith("med1").fillna(False), "trial_type"] = "mwt"
+    # df["trial_type"] = df.msg.str.split("CueStarted-").str[1].str.split("_").str[0].replace({"lux3": "bct", "med1": "mwt"})
     # Get duration of each cue (this ASSUMES there is a start for every stop)
     assert df.msg.str.contains("CueStarted").sum() == df.msg.str.contains("CueStarted").sum(), "Make sure each cue has both start and stop messages."
     assert df.msg.str.contains("DreamReportStarted").sum() == df.msg.str.contains("DreamReportStopped").sum(), "Make sure each dream report has both start and stop messages."
@@ -99,7 +112,8 @@ def read_smacc_log(filepath):
     df["description"] = df.description.str.rsplit("Started").str[0]
     # Add *initial* volume for cues.
     df["volume"] = df.msg.str.split("Volume ").str[1].str.split(" - ").str[0]
-    df["description"] = df["description"].replace({"Parallel port connection succeeded.": "CONNECTION"})
+    df.loc[df.description.str.startswith("Parallel port connection"), "description"] = "CONNECTION"
+    # df["description"] = df["description"].replace({"Parallel port connection succeeded.": "CONNECTION"})
     df = df.drop(columns="msg")
     # Remove cues from before lights were out??
 
@@ -282,3 +296,55 @@ def generate_events_sidecar(columns, **kwargs):
     #     "Code": "doi:10.5281/zenodo.3361717"
     # }
     return info | kwargs
+
+
+################################################################################
+# PLOTTING
+################################################################################
+
+
+def set_matplotlib_style(mpl_style="technical"):
+    if mpl_style == "technical":
+        # plt.rcParams["figure.dpi"] = 600
+        plt.rcParams["savefig.dpi"] = 600
+        plt.rcParams["interactive"] = True
+        plt.rcParams["figure.constrained_layout.use"] = True
+        plt.rcParams["font.family"] = "Times New Roman"
+        # plt.rcParams["font.sans-serif"] = "Arial"
+        plt.rcParams["mathtext.fontset"] = "custom"
+        plt.rcParams["mathtext.rm"] = "Times New Roman"
+        plt.rcParams["mathtext.cal"] = "Times New Roman"
+        plt.rcParams["mathtext.it"] = "Times New Roman:italic"
+        plt.rcParams["mathtext.bf"] = "Times New Roman:bold"
+        plt.rcParams["font.size"] = 8
+        plt.rcParams["axes.titlesize"] = 8
+        plt.rcParams["axes.labelsize"] = 8
+        plt.rcParams["axes.labelsize"] = 8
+        plt.rcParams["xtick.labelsize"] = 8
+        plt.rcParams["ytick.labelsize"] = 8
+        plt.rcParams["axes.linewidth"] = 0.8 # edge line width
+        plt.rcParams["axes.axisbelow"] = True
+        plt.rcParams["axes.grid"] = True
+        plt.rcParams["axes.grid.axis"] = "y"
+        plt.rcParams["axes.grid.which"] = "major"
+        plt.rcParams["axes.labelpad"] = 4
+        plt.rcParams["xtick.top"] = True
+        plt.rcParams["ytick.right"] = True
+        plt.rcParams["xtick.direction"] = "in"
+        plt.rcParams["ytick.direction"] = "in"
+        plt.rcParams["grid.color"] = "gainsboro"
+        plt.rcParams["grid.linewidth"] = 1
+        plt.rcParams["grid.alpha"] = 1
+        plt.rcParams["legend.frameon"] = False
+        plt.rcParams["legend.edgecolor"] = "black"
+        plt.rcParams["legend.fontsize"] = 8
+        plt.rcParams["legend.title_fontsize"] = 8
+        plt.rcParams["legend.borderpad"] = .4
+        plt.rcParams["legend.labelspacing"] = .2 # the vertical space between the legend entries
+        plt.rcParams["legend.handlelength"] = 2 # the length of the legend lines
+        plt.rcParams["legend.handleheight"] = .7 # the height of the legend handle
+        plt.rcParams["legend.handletextpad"] = .2 # the space between the legend line and legend text
+        plt.rcParams["legend.borderaxespad"] = .5 # the border between the axes and legend edge
+        plt.rcParams["legend.columnspacing"] = 1 # the space between the legend line and legend text
+    else:
+        raise ValueError(f"matplotlib style {mpl_style} is not an option")

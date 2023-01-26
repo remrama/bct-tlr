@@ -3,6 +3,7 @@
 import argparse
 
 import numpy as np
+import pandas as pd
 import pyreadstat
 
 import utils
@@ -13,7 +14,7 @@ parser.add_argument(
     "--survey",
     type=str,
     required=True,
-    choices=["Initial+Survey", "Debriefing+Survey", "Dream+Report"],
+    choices=["Initial+Survey", "Debriefing+Survey", "Dream+Report", "sub-004+Followup"],
 )
 args = parser.parse_args()
 
@@ -28,15 +29,17 @@ survey_descriptions = {
     "Initial+Survey": "A survey of demographics and state measures, completed before tasks.",
     "Debriefing+Survey": "A survey of more demographics, state measures, and debriefing questions, completed after tasks",
     "Dream+Report": "A dream report, completed immediately after an experimental awakening.",
+    "sub-004+Followup": "TODO",
 }
 
 # Identify location to import from and export to, and make sure export directory exists.
-import_dir = utils.ROOT_DIR / "sourcedata"
-export_dir = utils.ROOT_DIR / "phenotype"
+source_dir = utils.SOURCE_DIR
+phenotype_dir = utils.ROOT_DIR / "phenotype"
+raw_dir = utils.ROOT_DIR
 
 # Find the relevant file with a glob-search and confirming filename to Qualtrics convention.
 glob_name = f"*{survey_name}*.sav"
-potential_import_paths = list(import_dir.glob(glob_name))
+potential_import_paths = list(source_dir.glob(glob_name))
 assert len(potential_import_paths) == 1, "Only the latest Qualtrics file should be present."
 import_path = potential_import_paths[0]
 
@@ -111,7 +114,9 @@ for col in df:
         column_info["Probe"] = meta.column_names_to_labels[col]
     # Get response option strings (if present).
     if col in meta.variable_value_labels:
-        column_info["Levels"] = meta.variable_value_labels[col]
+        levels = meta.variable_value_labels[col]
+        levels = { int(float(k)): v for k, v in levels.items() }
+        column_info["Levels"] = levels
     if column_info:
         sidecar[col] = column_info
 
@@ -123,9 +128,37 @@ for col in df:
 # Replace empty strings with NaNs.
 df = df.replace("", np.nan)
 
-export_name = survey_name.lower().replace("+", "_") + ".tsv"
-export_path_data = export_dir / export_name
-export_path_sidecar = export_path_data.with_suffix(".json")
+df["ParticipantNum"] = df["ParticipantNum"].astype(int).map("sub-{:03d}".format)
+df["SessionNum"] = df["SessionNum"].astype(int).map("ses-{:03d}".format)
+df = df.rename(columns={"ParticipantNum": "participant_id", "SessionNum": "session_id"})
 
-utils.export_tsv(df, export_path_data, index=False)
-utils.export_json(sidecar, export_path_sidecar)
+if survey_name == "Dream+Report":
+    df = df.rename(columns={"AwakeningNum": "awakening_id"})
+    df["awakening_id"] = df["awakening_id"].astype(int).map("awk-{:02d}".format)
+    assert not df.duplicated(subset=["participant_id", "session_id", "awakening_id"]).any()
+    for (subject, session), awakenings in df.groupby(["participant_id", "session_id"]):
+        export_name =  f"{subject}_task-sleep_acq-nap_awakenings.tsv"
+        export_path = raw_dir / subject / export_name
+        awakenings = awakenings.drop(columns=["participant_id", "session_id"])
+
+        # Get onset of each awakening wrt the EEG file.
+        import_path_events = raw_dir / subject / f"{subject}_task-sleep_acq-nap_events.tsv"
+        events = pd.read_csv(import_path_events, sep="\t")
+        n_awakenings = len(awakenings)
+        n_reports = events["description"].value_counts().at["DreamReport"]
+        assert n_awakenings == n_reports, (
+            f"Number of awakenings {n_awakenings} should match the number of "
+            f"Dream Reports {n_reports} in EEG events file."
+        )
+        report_onsets = events.loc[events["description"].eq("DreamReport"), "onset"].tolist()
+        awakenings.insert(1, "onset", report_onsets)
+
+        sidecar["onset"] = utils.import_json(import_path_events.with_suffix(".json"))["onset"]
+
+        utils.export_tsv(awakenings, export_path, index=False)
+        utils.export_json(sidecar, export_path.with_suffix(".json"))
+else:
+    export_name = survey_name.lower().replace("+", "_") + ".tsv"
+    export_path = phenotype_dir / export_name
+    utils.export_tsv(df, export_path, index=False)
+    utils.export_json(sidecar, export_path.with_suffix(".json"))
