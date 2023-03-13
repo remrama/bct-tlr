@@ -14,7 +14,7 @@ import utils
 utils.set_matplotlib_style()
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, default=4)
+parser.add_argument("--participant", type=int, required=True)
 # parser.add_argument("--proba", action="store_true", help="Plot underlying probability estimates of all stages.")
 # parser.add_argument("--cues", action="store_true", help="Overlay timestamped cues")
 args = parser.parse_args()
@@ -26,7 +26,7 @@ layout = BIDSLayout(utils.ROOT_DIR, derivatives=True, validate=False)
 # stimuli_dir = bids_root / "stimuli"
 bids_files = layout.get(subject=f"{participant:03d}",
     task="sleep",
-    acquisition="overnight",
+    acquisition="nap",
     # suffix="hypno",
     extension=".tsv",
     # return_type="filename",

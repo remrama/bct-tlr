@@ -1,18 +1,12 @@
 """
-Take in original .cnt EEG files (Neuroscan) and:
+Take in original Neuroscan .cnt EEG files and SMACC .log files to:
     - Split into separate task segments (sleep, BCT, MW, SVP)
     - Apply minimal preprocessing (rereferencing, filtering)
-    - Export as .fif EEG files
+    - Export as .edf EEG files
     - Export corresponding metadata for each file (events, channels, and all sidecars)
-
-This also involves loading in and processing the SMACC log files.
 """
-
 from datetime import timezone
 import argparse
-
-# from os import getcwd
-# from os.path import relpath
 
 import mne
 import numpy as np
@@ -26,7 +20,7 @@ import utils
 mne.set_log_level(verbose=utils.MNE_VERBOSITY)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, default=907)
+parser.add_argument("--participant", type=int, required=True)
 parser.add_argument("--session", type=int, default=1)
 args = parser.parse_args()
 
@@ -110,15 +104,21 @@ for p in task_code_paths:
     desc2val = utils.import_json(p)
     val2desc = { v: k for k, v in desc2val.items() }
     # Remove some descriptions/codes we don't care about for now.
-    val2desc = { k: v for k, v in val2desc.items() if v.split("-")[-1] not in ["target", "nontarget", "reset"] }
+    # val2desc = { k: v for k, v in val2desc.items() if v.split("-")[-1] not in ["target", "nontarget", "reset"] }
+    # Rename behavioral task button-press descriptions.
+    for k, v in val2desc.items():
+        if v.split("-")[-1] in ["target", "nontarget", "reset"]:
+            task, press = v.split("-")
+            val2desc[k] = f"{task.capitalize()}Press{press.capitalize()}"
     task_codes.update(val2desc)
 event_codes = task_codes | smacc_codes
-event_codes = { k: event_codes[k] for k in sorted(event_codes) }
+event_codes = {k: event_codes[k] for k in sorted(event_codes)}
+
 # Add Note code for temp fix?
 # all_codes[204] = "Note"
 
 # unused_ann_indices = [ i for i, a in enumerate(raw.annotations) if int(a["description"]) not in events["value"].values ]
-unused_ann_indices = [ i for i, a in enumerate(raw.annotations) if int(a["description"]) not in event_codes ]
+unused_ann_indices = [i for i, a in enumerate(raw.annotations) if int(a["description"]) not in event_codes]
 raw.annotations.delete(unused_ann_indices)
 # assert len(raw.annotations) == len(events)
 
@@ -127,6 +127,7 @@ if participant == 907:
     raw.annotations.delete(0)
 
 # Generate events DataFrame from EEG file.
+## NOTE difference between BIDS events (desired) and MNE events. The latter has different units.
 events = raw.annotations.to_data_frame()
 # events["timestamp"] = events["onset"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
 events["onset"] = raw.annotations.onset  # Seconds from start of file.
@@ -149,17 +150,71 @@ if participant == 908:
     }
     events = pd.concat([events, pd.DataFrame(lights_on_row)], ignore_index=True)
 
-# Merge to carry extra info over.
-smacc = smacc.set_index(events.query("~description.str.contains('-')").index)
-events["duration"] = smacc["duration"].fillna(0)
-events = events.join(smacc[["stim_file", "trial_type", "volume"]])
+# #### Merge to carry extra info over.
+# smacc = smacc.set_index(events.query("~description.str.contains('-')").index)
+# # events["duration"] = smacc["duration"].fillna(0)
+# # events = events.join(smacc[["stim_file", "trial_type", "volume"]])
+# # Make a function to match events between SMACC and EEG file
+# # (clock time between systems is not perfect, take EEG as truth)
+# # Sloppy for now
+# # events_stamp = events.query("description.eq('CONNECTION')").onset.to_numpy()[0]
+# # smacc["onset"] = smacc["timestamp"].diff().dt.total_seconds().fillna(events_stamp).cumsum()
+# # # still milliseconds off, so again take EEG as truth, right?
+# # a = events.loc[273:, "onset"]#.to_numpy()
+# # b = smacc["onset"]#.to_numpy()
+# # assert a.size == b.size
+# # assert pd.Series(a).sub(b).le(0.01).all(), "make sure SMACC and events file are synced"
+# # idx = pd.Index(a).get_indexer(pd.Index(b), method="nearest")
+# # or just use smacc.reindex(tolerance=)
+# # idx = pd.Series(a).sub(b).abs().idxmin()
+# # idx - pd.Series(a).sub(b).abs().argsort().to_numpy()
+# #### TODO: THE ABOVE CODE INDICATES INCREASING TIME DISCREPANCIES BETWEEN SMACC AND EEG,
+# #####      NEED TO FIGURE OUT WHY
+# a = events.query("description.eq('CONNECTION')").index[0]
+# b = events.query("description.eq('LightsOn')").index[-1]
+# smacc.reindex(index=range(a, b+1))
+
 
 if participant == 909:
-    # Button-mashed lights on/off at the end of this subject, remove.
-    events = events.drop(index=[25, 26, 27, 28]).reset_index(drop=True)
+    # # Button-mashed lights on/off at the end of this subject, remove.
+    # events = events.drop(index=[25, 26, 27, 28]).reset_index(drop=True)
+    # Get extra indices and drop them
+    extras = events.query("description.isin(['LightsOff', 'LightsOn'])").iloc[2:].index.tolist()
+    events = events.drop(index=extras).reset_index(drop=True)
+if participant == 3:
+    # Forgot last lights-on before BCT.
+    # Use bct-start as rough estimate.
+    bct2_onset = events.query("description.eq('bct-start')")["onset"].iloc[-1]
+    lights_on_row = {
+        "onset": [bct2_onset - 60],
+        "duration": [0],
+        "value": [{ v: k for k, v in event_codes.items() }["LightsOn"]],
+        "description": ["LightsOn"],
+    }
+    events = pd.concat([events, pd.DataFrame(lights_on_row)], ignore_index=True)
+    events = events.sort_values("onset").reset_index(drop=True)
 if participant == 4:
-    # First BCT participant didn't push anything, so we redid it.
-    events = events.drop(index=[10, 11]).reset_index(drop=True)
+    # testing cues at start
+    events = events.loc[8:].reset_index(drop=True)
+    # First BCT, participant didn't push anything, so we redid it.
+    events = events.drop(index=range(2, 22)).reset_index(drop=True)
+if participant == 5:
+    # Drop testing before exp started
+    events = events.loc[7:].reset_index(drop=True)
+    bct1_onset = events.query("description.eq('BctPressNontarget')")["onset"].iloc[0]
+    lights_on_row = {
+        "onset": [bct1_onset - 60],
+        "duration": [0],
+        "value": [{ v: k for k, v in event_codes.items() }["LightsOn"]],
+        "description": ["LightsOn"],
+    }
+    events = pd.concat([events, pd.DataFrame(lights_on_row)], ignore_index=True)
+    events = events.sort_values("onset").reset_index(drop=True)
+    # Missed first lights on for WBTB awakening, then smashed them a few times. Adjust.
+    # remove the times i smashed it later.
+    # Get extra indices and drop them
+    extras = events.query("description.isin(['LightsOff', 'LightsOn'])").iloc[2:-2].index.tolist()
+    events = events.drop(index=extras).reset_index(drop=True)
 
 # Remove existing annotations in EEG raw file to avoid redundancy with events file and remove unwanted.
 while raw.annotations:
@@ -229,7 +284,7 @@ events["description"] = events["description"].replace({"LightsOff": "sleep-start
 #     events.at[events.description.eq("nap-stop").argmax(), "description"] = "overnight-stop"
 
 # Participants performed different tasks, but all should have done their task before and after nap.
-tasks_performed = { x.split("-")[0] for x in events["description"].unique() if x.endswith("start") }
+tasks_performed = {x.split("-")[0] for x in events["description"].unique() if x.endswith("start")}
 for task in tasks_performed:
     # n_times = 1 if task in ["overnight", "nap"] else 2
     n_times = 2
@@ -300,10 +355,10 @@ for task in tqdm.tqdm(tasks_performed, desc="EEG splitting and preprocessing tas
         # Convert from MNE FIFF codes
         fiff2str = {2: "eeg", 202: "eog", 302: "emg", 402: "ecg", 502: "misc"}
         channels_data = {
-            "name": [ x["ch_name"] for x in raw_.info["chs"] ], # OR raw_.ch_names
-            "type": [ fiff2str[x["kind"]].upper() for x in raw_.info["chs"] ],
+            "name": [x["ch_name"] for x in raw_.info["chs"]], # OR raw_.ch_names
+            "type": [fiff2str[x["kind"]].upper() for x in raw_.info["chs"]],
             # "types": [ raw_.get_channel_types(x)[0].upper() for x in raw_.ch_names ],
-            "units": [ x["unit"] for x in raw_.info["chs"] ],
+            "units": [x["unit"] for x in raw_.info["chs"]],
             "description": "none",
             "sampling_frequency": raw_.info["sfreq"],
             "reference": reference_channel,
@@ -358,16 +413,18 @@ for task in tqdm.tqdm(tasks_performed, desc="EEG splitting and preprocessing tas
             acq = "nap" if i == 1 or n_sleep_tasks == 1 else "overnight"
         else:  # behavioral tasks
             acq = "pre" if i == 0 else "post"
+        export_parent = ROOT_DIR / participant_id / "eeg"
         export_stem = f"{participant_id}_task-{task}_acq-{acq}"
         export_name_eeg = export_stem + "_eeg.edf"# + utils.EEG_RAW_EXTENSION
         export_name_events = export_stem + "_events.tsv"
         export_name_channels = export_stem + "_channels.tsv"
-        export_path_eeg = ROOT_DIR / participant_id / export_name_eeg
-        export_path_events = ROOT_DIR / participant_id / export_name_events
-        export_path_channels = ROOT_DIR / participant_id / export_name_channels
+        export_path_eeg = export_parent / export_name_eeg
+        export_path_events = export_parent / export_name_events
+        export_path_channels = export_parent / export_name_channels
 
         # Export.
         # raw_.save(export_path_eeg, fmt="single", overwrite=True, split_naming="bids")
+        export_parent.mkdir(parents=True, exist_ok=True)
         mne.export.export_raw(export_path_eeg, raw_, add_ch_type=False, overwrite=True)
         utils.export_json(eeg_sidecar, export_path_eeg.with_suffix(".json"))
         utils.export_tsv(channels, export_path_channels)

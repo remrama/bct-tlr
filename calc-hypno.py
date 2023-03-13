@@ -13,7 +13,7 @@ import utils
 mne.set_log_level(verbose=utils.MNE_VERBOSITY)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, default=4)
+parser.add_argument("--participant", type=int, required=True)
 parser.add_argument("--overwrite", action="store_true")
 args = parser.parse_args()
 
@@ -24,23 +24,26 @@ participant = args.participant
 import_path = utils.ROOT_DIR / "phenotype" / "initial_survey.tsv"
 demogr = pd.read_csv(import_path, sep="\t")
 
-age = demogr.loc[participant, "Age"]
-if age == 1:
-    metadata = {"age": 20}
-elif age == 2:
-    metadata = {"age": 30}
-elif age == 3:
-    metadata = {"age": 40}
-elif age == 4:
-    metadata = {"age": 50}
-elif age == 5:
-    metadata = {"age": 60}
-elif age == 6:
-    metadata = {"age": 70}
+if participant in demogr.index:
+    age = demogr.loc[participant, "Age"]
+    if age == 1:
+        metadata = {"age": 20}
+    elif age == 2:
+        metadata = {"age": 30}
+    elif age == 3:
+        metadata = {"age": 40}
+    elif age == 4:
+        metadata = {"age": 50}
+    elif age == 5:
+        metadata = {"age": 60}
+    elif age == 6:
+        metadata = {"age": 70}
 
-gender = demogr.loc[participant, "Sex"]
-if gender in [1, 2]:
-    metadata["male"] = True if gender == 1 else False
+    gender = demogr.loc[participant, "Sex"]
+    if gender in [1, 2]:
+        metadata["male"] = True if gender == 1 else False
+else:
+    metadata = None
 
 eeg_channel = "Fz"
 eog_channel = "R-HEOG"
@@ -89,8 +92,8 @@ for bf in tqdm.tqdm(bids_files, desc="Sleep Staging"):
     n_epochs = len(hypno_str)
     hypno_int = yasa.hypno_str_to_int(hypno_str)
     hypno_events = {
-        "onset": [ epoch_length*i for i in range(n_epochs) ],
-        "duration": [ epoch_length for i in range(n_epochs) ],
+        "onset": [epoch_length*i for i in range(n_epochs)],
+        "duration": [epoch_length for i in range(n_epochs)],
         "value" : hypno_int,
         "description" : hypno_str,
         "scorer": f"YASA-v{yasa.__version__}",

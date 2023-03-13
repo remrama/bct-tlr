@@ -4,6 +4,7 @@ from datetime import timezone
 import json
 from pathlib import Path
 
+import colorcet as cc
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -302,6 +303,11 @@ def generate_events_sidecar(columns, **kwargs):
 # PLOTTING
 ################################################################################
 
+def load_participant_palette():
+    df = load_participants_file().reset_index()
+    df["color"] = df.index.map(cc.cm.glasbey_dark)
+    palette = df.set_index("participant_id")["color"].to_dict()
+    return palette
 
 def set_matplotlib_style(mpl_style="technical"):
     if mpl_style == "technical":

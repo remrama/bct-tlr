@@ -37,14 +37,12 @@ column_metadata = {
 
     "cycle": {
         "LongName": "Cycle count",
-        "Description": "Indicates the cycle number, which ends on either a target or reset press.",
-        "Dtype": "int"
+        "Description": "Indicates the cycle number, which ends on either a target or reset press."
     },
 
     "press": {
         "LongName": "Press count",
         "Description": "Indicates the press count within each cycle",
-        "Dtype": "int",
         "Levels": {
             "nontarget": "Breaths 1-8",
             "target": "Breath 9"
@@ -54,7 +52,6 @@ column_metadata = {
     "response": {
         "LongName": "Button response",
         "Description": "Indicator of what button was pushed",
-        "Dtype": "str",
         "Levels": {
             "left": "participant estimated a nontarget trial",
             "right": "participant estimated a target trial",
@@ -63,9 +60,8 @@ column_metadata = {
     },
 
     "response_time": {
-        "Description": "Indicator of time between prior and current response",
-        "Dtype": "float",
-        "Units": "milliseconds"
+        "LongName": "Response time (ms)",
+        "Description": "Indicator of time (milliseconds) between prior and current response"
     },
 
     "accuracy": {
@@ -126,12 +122,12 @@ def press_accuracy(row):
 for fp in filepaths:
 
     sub_number = int(fp.parts[-2].split("-")[1])
-    if 901 <= sub_number <= 906:
+    if 900 < sub_number < 907:
         continue
 
     # Load data.
     df = pd.read_csv(fp, sep="\t", names=["timestamp", "level", "info"])
-    df["level"] = df["level"].str.strip() # psychopy has a space after these for some reason
+    df["level"] = df["level"].str.strip()  # psychopy has a space after these for some reason
 
     # Restrict to after the task started and before it ended.
     assert df["info"].eq("Main task started").sum() == 1
@@ -205,13 +201,9 @@ for fp in filepaths:
     suffix_id = "beh"
 
     stem = "_".join([subject_id, task_id, acquisition_id, suffix_id])
-    export_path_data = ROOT_DIR / subject_id / suffix_id / f"{stem}.tsv"
-    export_path_sidecar = export_path_data.with_suffix(".json")
-    export_path_data.parent.mkdir(parents=True, exist_ok=True)
-
-    # df = df.to_csv(export_path_data, sep="\t", index=False, float_format="%.2f")
-    utils.export_tsv(df, export_path_data, index=False)
-    utils.export_json(sidecar, export_path_sidecar)
+    export_path = ROOT_DIR / subject_id / suffix_id / f"{stem}.tsv"
+    utils.export_tsv(df, export_path, index=False)
+    utils.export_json(sidecar, export_path.with_suffix(".json"))
 
     # with open(file, "r", encoding="utf-8") as f:
     #     subject_data = json.load(f)

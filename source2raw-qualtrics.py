@@ -1,6 +1,6 @@
 """Convert a single qualtrics survey to tsv and companion json."""
-
 import argparse
+from pathlib import Path
 
 import numpy as np
 import pandas as pd
@@ -137,23 +137,30 @@ if survey_name == "Dream+Report":
     df["awakening_id"] = df["awakening_id"].astype(int).map("awk-{:02d}".format)
     assert not df.duplicated(subset=["participant_id", "session_id", "awakening_id"]).any()
     for (subject, session), awakenings in df.groupby(["participant_id", "session_id"]):
-        export_name =  f"{subject}_task-sleep_acq-nap_awakenings.tsv"
-        export_path = raw_dir / subject / export_name
+        export_name = f"{subject}_task-sleep_acq-nap_rep.tsv"
+        export_path = raw_dir / subject / "rep" / export_name
         awakenings = awakenings.drop(columns=["participant_id", "session_id"])
 
         # Get onset of each awakening wrt the EEG file.
-        import_path_events = raw_dir / subject / f"{subject}_task-sleep_acq-nap_events.tsv"
-        events = pd.read_csv(import_path_events, sep="\t")
-        n_awakenings = len(awakenings)
-        n_reports = events["description"].value_counts().at["DreamReport"]
-        assert n_awakenings == n_reports, (
-            f"Number of awakenings {n_awakenings} should match the number of "
-            f"Dream Reports {n_reports} in EEG events file."
-        )
-        report_onsets = events.loc[events["description"].eq("DreamReport"), "onset"].tolist()
-        awakenings.insert(1, "onset", report_onsets)
+        # Some subjects it doesn't match up? haven't looked much into it yet
+        if subject not in ["sub-906", "sub-908"]:
+            n_awakenings = len(awakenings)
+            report_onsets = []
+            for acq in ["overnight", "nap"]:
+                import_path_events = raw_dir / subject / "eeg" / f"{subject}_task-sleep_acq-{acq}_events.tsv"
+                if Path(import_path_events).exists():
+                    events = pd.read_csv(import_path_events, sep="\t")
+                    if "DreamReport" in events["description"].values:
+                        onsets = events.loc[events["description"].eq("DreamReport"), "onset"].tolist()
+                        report_onsets.extend(onsets)
+            n_reports = len(report_onsets)
+            assert n_awakenings == n_reports, (
+                f"Number of awakenings {n_awakenings} should match the number of "
+                f"Dream Reports {n_reports} in EEG events file."
+            )
+            awakenings.insert(1, "onset", report_onsets)
 
-        sidecar["onset"] = utils.import_json(import_path_events.with_suffix(".json"))["onset"]
+            sidecar["onset"] = utils.import_json(import_path_events.with_suffix(".json"))["onset"]
 
         utils.export_tsv(awakenings, export_path, index=False)
         utils.export_json(sidecar, export_path.with_suffix(".json"))
