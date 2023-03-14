@@ -16,7 +16,6 @@ class MindWanderingTask(Game):
         self.instructions_messages = [
             f"For the next {self.task_length_mins} minutes, just sit and let your mind wander.",
             "We only ask you keep your eyes open and don't fall asleep.\n\nOnce you are ready, press the button below."
-            f"Try to write continuously about whatever is on your mind.\n\nDo not use abbreviations and try your best to spell correctly.\n\nOnce you are ready, press the button below."
         ]
         self.header_text = "Relax and think about whatever you'd like."
 
@@ -37,7 +36,7 @@ class MindWanderingTask(Game):
 
     def run(self):
         self.init()
-        self.show_message_and_wait_for_press(self.prompt1)
+        self.show_instructions()
         self.task()
         self.quit()
 
