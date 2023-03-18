@@ -130,6 +130,7 @@ if participant == 907:
 ## NOTE difference between BIDS events (desired) and MNE events. The latter has different units.
 events = raw.annotations.to_data_frame()
 # events["timestamp"] = events["onset"].dt.tz_localize("US/Central").dt.tz_convert(timezone.utc)
+events["timestamp"] = events["onset"].dt.tz_localize("UTC")
 events["onset"] = raw.annotations.onset  # Seconds from start of file.
 events.insert(2, "value", events["description"].astype(int))
 events["description"] = events["value"].map(event_codes)
@@ -150,26 +151,44 @@ if participant == 908:
     }
     events = pd.concat([events, pd.DataFrame(lights_on_row)], ignore_index=True)
 
-# #### Merge to carry extra info over.
+
+#### Merge to carry extra info over.
+#### Merge SMACC log file info (e.g., duration) with EEG annotations/events.
+# smacc["timestamp"] = smacc["timestamp"].tz_convert(timezone.utc)
+# Use connection to get time difference between smacc and eeg computers.
+t0 = events["timestamp"][0]  # TODO: assert this is CONNECTION
+t1 = smacc["timestamp"][0]  # TODO: assert this is CONNECTION
+td = t1 - t0
+smacc["timestamp"] = smacc["timestamp"].sub(td)
+
+# events = events.set_index("timestamp")
+# smacc = smacc.set_index("timestamp")
+#### TODO: set timestamp indices permanently and wrk with those
+indxer = events.set_index("timestamp").index.get_indexer(smacc.set_index("timestamp").index, method="nearest")
+smacc = smacc.set_index(indxer)
+
+events = events.join(smacc[["stim_file", "trial_type", "volume"]])
+events.loc[smacc.index, "duration"] = smacc["duration"].fillna(0)
+
 # smacc = smacc.set_index(events.query("~description.str.contains('-')").index)
-# # events["duration"] = smacc["duration"].fillna(0)
-# # events = events.join(smacc[["stim_file", "trial_type", "volume"]])
-# # Make a function to match events between SMACC and EEG file
-# # (clock time between systems is not perfect, take EEG as truth)
-# # Sloppy for now
-# # events_stamp = events.query("description.eq('CONNECTION')").onset.to_numpy()[0]
-# # smacc["onset"] = smacc["timestamp"].diff().dt.total_seconds().fillna(events_stamp).cumsum()
-# # # still milliseconds off, so again take EEG as truth, right?
-# # a = events.loc[273:, "onset"]#.to_numpy()
-# # b = smacc["onset"]#.to_numpy()
-# # assert a.size == b.size
-# # assert pd.Series(a).sub(b).le(0.01).all(), "make sure SMACC and events file are synced"
-# # idx = pd.Index(a).get_indexer(pd.Index(b), method="nearest")
-# # or just use smacc.reindex(tolerance=)
-# # idx = pd.Series(a).sub(b).abs().idxmin()
-# # idx - pd.Series(a).sub(b).abs().argsort().to_numpy()
-# #### TODO: THE ABOVE CODE INDICATES INCREASING TIME DISCREPANCIES BETWEEN SMACC AND EEG,
-# #####      NEED TO FIGURE OUT WHY
+# events["duration"] = smacc["duration"].fillna(0)
+# events = events.join(smacc[["stim_file", "trial_type", "volume"]])
+# Make a function to match events between SMACC and EEG file
+# (clock time between systems is not perfect, take EEG as truth)
+# Sloppy for now
+# events_stamp = events.query("description.eq('CONNECTION')").onset.to_numpy()[0]
+# smacc["onset"] = smacc["timestamp"].diff().dt.total_seconds().fillna(events_stamp).cumsum()
+# # still milliseconds off, so again take EEG as truth, right?
+# a = events.loc[273:, "onset"]#.to_numpy()
+# b = smacc["onset"]#.to_numpy()
+# assert a.size == b.size
+# assert pd.Series(a).sub(b).le(0.01).all(), "make sure SMACC and events file are synced"
+# idx = pd.Index(a).get_indexer(pd.Index(b), method="nearest")
+# or just use smacc.reindex(tolerance=)
+# idx = pd.Series(a).sub(b).abs().idxmin()
+# idx - pd.Series(a).sub(b).abs().argsort().to_numpy()
+#### TODO: THE ABOVE CODE INDICATES INCREASING TIME DISCREPANCIES BETWEEN SMACC AND EEG,
+#####      NEED TO FIGURE OUT WHY
 # a = events.query("description.eq('CONNECTION')").index[0]
 # b = events.query("description.eq('LightsOn')").index[-1]
 # smacc.reindex(index=range(a, b+1))

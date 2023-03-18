@@ -259,6 +259,10 @@ def generate_events_sidecar(columns, **kwargs):
             "LongName": "Onset (in seconds) of the event",
             "Description": "Onset (in seconds) of the event"
         },
+        "timestamp": {
+            "LongName": "Onset (in UTC) of the event",
+            "Description": "Onset (in UTC) of the event"
+        },
         "duration": {
             "LongName": "Duration of the event (measured from onset) in seconds",
             "Description": "Duration of the event (measured from onset) in seconds"
