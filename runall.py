@@ -13,10 +13,10 @@ def run_command(command):
 
 participants = [1, 2, 3, 4, 5, 907, 908, 909]
 participant_scripts = [
-    # "source2raw-eeg",  # Convert EEG file to separate BIDS-formatted edf (and associated) files.
-    # "calc-hypno",  # Calculate overnight and nap hypnograms.
-    # "plot-hypno",  # Plot overnight and night hypnograms.
-    # "calc-cues",  # Calculate number of cues per sleep stage.
+    "source2raw-eeg",  # Convert EEG file to separate BIDS-formatted edf (and associated) files.
+    "calc-hypno",  # Calculate overnight and nap hypnograms.
+    "plot-hypno",  # Plot overnight and night hypnograms.
+    "calc-cues",  # Calculate number of cues per sleep stage.
     "calc-resp",  # Calculate respiration features/timecourses.
     "plot-resp_hypno"  # Plot respiration rate aligned with hypnogram.
 ]
