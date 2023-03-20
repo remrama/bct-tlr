@@ -156,8 +156,8 @@ if participant == 908:
 #### Merge SMACC log file info (e.g., duration) with EEG annotations/events.
 # smacc["timestamp"] = smacc["timestamp"].tz_convert(timezone.utc)
 # Use connection to get time difference between smacc and eeg computers.
-t0 = events["timestamp"][0]  # TODO: assert this is CONNECTION
-t1 = smacc["timestamp"][0]  # TODO: assert this is CONNECTION
+t0 = events.query("description == 'CONNECTION'")["timestamp"].values[0]  # TODO: assert this is CONNECTION
+t1 = smacc.query("description == 'CONNECTION'")["timestamp"].values[0]  # TODO: assert this is CONNECTION
 td = t1 - t0
 smacc["timestamp"] = smacc["timestamp"].sub(td)
 

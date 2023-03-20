@@ -7,15 +7,13 @@ import mne
 import neurokit2 as nk
 import numpy as np
 import pandas as pd
-import tqdm
 
 import utils
 
 mne.set_log_level(verbose=utils.MNE_VERBOSITY)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, required=True)
-parser.add_argument("--overwrite", action="store_true")
+parser.add_argument("-p", "--participant", type=int, required=True)
 args = parser.parse_args()
 
 
@@ -75,7 +73,7 @@ def get_rr_features(arr, sfreq):
     # b = nk.rsp_eventrelated(signals, sampling_rate=sfreq)
     return rr
 
-for bf in tqdm.tqdm(bids_files, desc="RRV"):
+for bf in bids_files:
 
     # Load raw data.
     raw = mne.io.read_raw_edf(bf.path)

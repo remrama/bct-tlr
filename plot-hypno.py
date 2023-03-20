@@ -14,7 +14,7 @@ import utils
 utils.set_matplotlib_style()
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, required=True)
+parser.add_argument("-p", "--participant", type=int, required=True)
 # parser.add_argument("--proba", action="store_true", help="Plot underlying probability estimates of all stages.")
 # parser.add_argument("--cues", action="store_true", help="Overlay timestamped cues")
 args = parser.parse_args()

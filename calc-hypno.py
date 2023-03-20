@@ -13,8 +13,7 @@ import utils
 mne.set_log_level(verbose=utils.MNE_VERBOSITY)
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, required=True)
-parser.add_argument("--overwrite", action="store_true")
+parser.add_argument("-p", "--participant", type=int, required=True)
 args = parser.parse_args()
 
 

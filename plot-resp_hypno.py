@@ -15,7 +15,7 @@ utils.set_matplotlib_style()
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-p", "--participant", type=int, required=True)
-parser.add_argument("-c", "--channel", type=str, default="RESP", choices=["RESP", "Airflow"])
+parser.add_argument("-c", "--channel", type=str, default="Airflow", choices=["RESP", "Airflow"])
 args = parser.parse_args()
 
 participant = args.participant
@@ -67,9 +67,9 @@ def cmap2hex(cmap, n_intervals) -> list:
 # Respiration
 fig, axes = plt.subplots(
     nrows=3,
-    figsize=(6, 4),
+    figsize=(3, 3),
     sharex=True, sharey=False,
-    gridspec_kw=dict(height_ratios=[1, 1, 1]),
+    gridspec_kw=dict(height_ratios=[2, 1, 1.5]),
 )
 
 ax_hypno = axes[0]
@@ -112,11 +112,11 @@ ax_hypno.spines[["top", "right"]].set_visible(False)
 ax_hypno.tick_params(axis="both", direction="out", top=False, right=False)
 ax_hypno.set_ybound(upper=n_stages)
 
-ax_hypno.text(1, 1,
+ax_hypno.text(0.01, 5,
     "Mindfulness audio cues",
     color="mediumpurple",
-    ha="right", va="bottom",
-    transform=ax_hypno.transAxes,
+    ha="left", va="top",
+    transform=ax_hypno.get_yaxis_transform(),
 )
 
 
@@ -151,12 +151,13 @@ rrv = resp["RSP_RVT"].to_numpy()
 plot_kwargs = dict(linewidth=0.5, linestyle="solid")
 ax_twin = ax_resp.twinx()
 ax_resp.plot(time_hrs, rrate, color="black", **plot_kwargs)
-ax_twin.plot(time_hrs, rrv, color="green", **plot_kwargs)
+ax_twin.plot(time_hrs, rrv, color="forestgreen", **plot_kwargs)
 ax_resp.set_ylabel("Respiration Rate")
-ax_twin.set_ylabel("RR Variability", rotation=270, va="bottom", color="green")
+ax_twin.set_ylabel("RR Variability", rotation=270, va="bottom", color="forestgreen")
 
 ax_resp.tick_params(axis="both", which="both", direction="out", top=False, right=False)
-ax_resp.set_xbound(lower=0, upper=hypno_hrs.max())
+# ax_resp.set_xbound(lower=0, upper=hypno_hrs.max())
+ax_resp.set_xbound(lower=0, upper=1.15)
 ax_resp.set_xlabel("Time (hours)")
 ax_resp.grid(False)
 ax_twin.grid(False)

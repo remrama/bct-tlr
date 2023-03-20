@@ -13,7 +13,7 @@ import utils
 
 
 parser = argparse.ArgumentParser()
-parser.add_argument("--participant", type=int, required=True)
+parser.add_argument("-p", "--participant", type=int, required=True)
 args = parser.parse_args()
 
 participant = args.participant
