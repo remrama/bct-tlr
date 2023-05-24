@@ -14,6 +14,10 @@ import utils
 utils.set_matplotlib_style()
 
 
+plt.rcParams["savefig.dpi"] = 1000
+plt.rcParams["font.family"] = "sans-serif"
+plt.rcParams["font.sans-serif"] = "Arial"
+
 export_path = utils.DERIVATIVES_DIR / "lucidity.png"
 
 layout = BIDSLayout(utils.ROOT_DIR, validate=False)
@@ -50,9 +54,9 @@ ci, dist = pg.compute_bootci(x, func="mean", method="cper", n_boot=2000, return_
 ci *= 100
 dist *= 100
 
-fig, ax = plt.subplots(figsize=(2, 2))
-ax.axhline(50, color="black", lw=1, ls="dashed", zorder=0)
-ax.text(0.7, 50, "Carr et al., 2020", ha="left", va="bottom", transform=ax.get_yaxis_transform())
+fig, ax = plt.subplots(figsize=(1.7, 2))
+ax.axhline(50, color="black", lw=0.5, ls="dashed", zorder=0)
+# ax.text(0.7, 50, "Carr et al., 2020", ha="left", va="bottom", transform=ax.get_yaxis_transform())
 box = ax.boxplot(dist,
     showmeans=True,
     boxprops=dict(
@@ -88,7 +92,9 @@ for patch in box["boxes"]:
     patch.set_facecolor("white")
 
 ax.set_ylabel(r"% of participants who became lucid")
-ax.tick_params(right=False, top=False, bottom=False, labelbottom=False)
+ax.tick_params(direction="out", which="both", right=False, top=False, bottom=False, labelbottom=False)
+ax.yaxis.set_major_locator(plt.MultipleLocator(50))
+ax.yaxis.set_minor_locator(plt.MultipleLocator(10))
 ax.spines[["top", "right", "bottom"]].set_visible(False)
 ax.grid(False)
 # ax.set_ylim(0, 100)
