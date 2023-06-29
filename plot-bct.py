@@ -14,6 +14,7 @@ bids_root = utils.ROOT_DIR
 derivatives_dir = utils.DERIVATIVES_DIR
 
 export_path = derivatives_dir / "task-bct.png"
+export_path_table = derivatives_dir / "task-bct.tsv"
 
 
 layout = BIDSLayout(bids_root)
@@ -54,6 +55,19 @@ table = acc.pivot(index="participant_id", columns="acquisition_id", values="accu
 table = table.dropna()
 
 acc_desc = table.describe().T.join(table.sem().rename("sem"))
+
+# Export summary table of BCT accuracy.
+table_export = (table
+    .drop(["sub-906", "sub-909"])
+    .sort_index(axis=1, ascending=False)
+    .rename_axis(columns=None)
+)
+table_export.loc["mean"] = table_export.iloc[:5].mean(axis=0)
+table_export.loc["std"] = table_export.iloc[:5].std(axis=0)
+table_export.loc["min"] = table_export.iloc[:5].min(axis=0)
+table_export.loc["median"] = table_export.iloc[:5].quantile(0.5, axis=0)
+table_export.loc["max"] = table_export.iloc[:5].max(axis=0)
+utils.export_tsv(table_export, export_path_table)
 
 
 pre, post = table[["acq-pre", "acq-post"]].T.to_numpy()

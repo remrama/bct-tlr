@@ -19,6 +19,7 @@ plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["font.sans-serif"] = "Arial"
 
 export_path = utils.DERIVATIVES_DIR / "lucidity.png"
+export_path_table = utils.DERIVATIVES_DIR / "lucidity.tsv"
 
 layout = BIDSLayout(utils.ROOT_DIR, validate=False)
 
@@ -48,6 +49,8 @@ df = df.query("Recall.eq(2)")
 
 
 ser = df.groupby("participant_id")["Lucidity"].max().ge(3).rename("had_lucid")
+utils.export_tsv(ser, export_path_table)
+
 x = ser.to_numpy()
 ci, dist = pg.compute_bootci(x, func="mean", method="cper", n_boot=2000, return_dist=True)
 
